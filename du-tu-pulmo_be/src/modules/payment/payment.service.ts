@@ -298,7 +298,6 @@ export class PaymentService {
 
     const { orderCode } = verifiedData;
     this.logger.log(`Processing webhook for order ${orderCode}`);
-    // Find payment
     const payment = await this.paymentRepository.findOne({
       where: { orderCode: String(orderCode) },
     });
@@ -308,7 +307,6 @@ export class PaymentService {
       return;
     }
 
-    // Update webhook tracking - SECURITY: Store safe metadata only
     payment.webhookReceivedAt = new Date();
     payment.webhookMetadata = {
       code: webhookData.code,
@@ -359,7 +357,6 @@ export class PaymentService {
     webhookData: WebhookData,
   ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
-      // Update payment
       payment.status = PaymentStatus.PAID;
       payment.paidAt = new Date(webhookData.data.transactionDateTime);
       payment.transactionReference = webhookData.data.reference;
@@ -374,7 +371,6 @@ export class PaymentService {
 
       await manager.save(payment);
 
-      // Update appointment status
       if (payment.appointmentId) {
         const appointment = await manager.findOne(Appointment, {
           where: { id: payment.appointmentId },
