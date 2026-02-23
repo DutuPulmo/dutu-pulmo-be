@@ -18,7 +18,13 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger configuration
+  const port = process.env.PORT ?? 3000;
+  const serverUrl =
+    process.env.PUBLIC_URL || `http://localhost:${port}`;
+
+  /**
+   * Swagger configuration
+   */
   const config = new DocumentBuilder()
     .setTitle('DuTu Pulmo API')
     .setDescription(
@@ -37,7 +43,7 @@ async function bootstrap() {
       },
       'JWT-auth',
     )
-    .addServer('http://localhost:3000', 'Local Development')
+    .addServer(serverUrl, 'Current Server')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -108,7 +114,6 @@ async function bootstrap() {
     customSiteTitle: 'DuTu Pulmo API Docs',
   });
 
-  const port = process.env.PORT ?? 3000;
   await app.listen(port);
 
   console.log(`🚀 Application running on: http://localhost:${port}`);
