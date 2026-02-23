@@ -205,6 +205,7 @@ export class PayosService implements OnModuleInit {
 
     try {
       const verifiedData = this.payOS.webhooks.verify(webhookBody);
+      this.logger.log(`Verified webhook ${verifiedData as unknown as WebhookData['data']}`);
       return verifiedData as unknown as WebhookData['data'];
     } catch (error) {
       this.logger.error(`Failed to verify webhook: ${error}`);

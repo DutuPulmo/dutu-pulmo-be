@@ -297,7 +297,7 @@ export class PaymentService {
     }
 
     const { orderCode } = verifiedData;
-
+    this.logger.log(`Processing webhook for order ${orderCode}`);
     // Find payment
     const payment = await this.paymentRepository.findOne({
       where: { orderCode: String(orderCode) },
