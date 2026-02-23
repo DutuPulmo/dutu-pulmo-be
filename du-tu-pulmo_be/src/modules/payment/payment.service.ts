@@ -290,7 +290,7 @@ export class PaymentService {
     );
 
     // Verify webhook signature
-    const verifiedData = this.payosService.verifyWebhookData(webhookData);
+    const verifiedData = await this.payosService.verifyWebhookData(webhookData);
     if (!verifiedData) {
       this.logger.warn('Invalid webhook signature');
       throw new BadRequestException(PAYMENT_ERRORS.INVALID_SIGNATURE);
