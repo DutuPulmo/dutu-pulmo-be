@@ -33,6 +33,23 @@ export class PaginationDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({
+    description: 'Trường dùng để sắp xếp kết quả',
+    example: 'createdAt',
+  })
+  @IsOptional()
+  @IsString()
+  sort?: string;
+
+  @ApiPropertyOptional({
+    description: 'Thứ tự sắp xếp (ASC hoặc DESC)',
+    enum: ['ASC', 'DESC'],
+    example: 'DESC',
+  })
+  @IsOptional()
+  @IsString()
+  order?: 'ASC' | 'DESC' = 'DESC';
 }
 
 export class PaginationMeta {
