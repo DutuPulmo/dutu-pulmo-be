@@ -5,9 +5,13 @@ import { Patient } from '@/modules/patient/entities/patient.entity';
 import { ResponseCommon } from '@/common/dto/response.dto';
 import { MedicalService } from '@/modules/medical/medical.service';
 import { AppointmentService } from '@/modules/appointment/services/appointment.service';
-import { PatientQueryDto, UpdatePatientDto } from '@/modules/patient/dto/patient.dto';
+import {
+  PatientQueryDto,
+  UpdatePatientDto,
+} from '@/modules/patient/dto/patient.dto';
 import { AppointmentStatusEnum } from '@/modules/common/enums/appointment-status.enum';
 import { PATIENT_ERRORS } from '@/common/constants/error-messages.constant';
+import { applyPaginationAndSort } from '@/common/utils/pagination.util';
 
 export interface PaginatedPatientResponseDto {
   items: Patient[];
@@ -40,10 +44,6 @@ export class PatientService {
   async findAll(
     query?: PatientQueryDto,
   ): Promise<ResponseCommon<PaginatedPatientResponseDto>> {
-    const page = query?.page || 1;
-    const limit = query?.limit || 10;
-    const skip = (page - 1) * limit;
-
     let queryBuilder = this.patientRepository
       .createQueryBuilder('patient')
       .leftJoinAndSelect('patient.user', 'user');
@@ -63,14 +63,17 @@ export class PatientService {
       });
     }
 
-    const totalItems = await queryBuilder.getCount();
+    applyPaginationAndSort(
+      queryBuilder,
+      query || {},
+      ['createdAt', 'bloodType', 'profileCode'],
+      'createdAt',
+      'DESC',
+    );
 
-    const patients = await queryBuilder
-      .orderBy('patient.createdAt', 'DESC')
-      .skip(skip)
-      .take(limit)
-      .getMany();
-
+    const [patients, totalItems] = await queryBuilder.getManyAndCount();
+    const limit = query?.limit || 10;
+    const page = query?.page || 1;
     const totalPages = Math.ceil(totalItems / limit);
 
     return new ResponseCommon(200, 'SUCCESS', {
@@ -142,6 +145,10 @@ export class PatientService {
     await this.patientRepository.update(id, updateData);
     return this.findOne(id);
   }
+
+  // ============================================================================
+  // MEDICAL DATA - Fetching related medical information
+  // ============================================================================
 
   // ============================================================================
   // MEDICAL DATA - Fetching related medical information

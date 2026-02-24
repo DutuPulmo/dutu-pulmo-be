@@ -18,7 +18,11 @@ import { UpdateDoctorDto } from '@/modules/doctor/dto/update-doctor.dto';
 import { ResponseCommon } from '@/common/dto/response.dto';
 import { RoleEnum } from '@/modules/common/enums/role.enum';
 import { VerificationStatus } from '@/modules/common/enums/doctor-verification-status.enum';
-import { AUTH_ERRORS, DOCTOR_ERRORS } from '@/common/constants/error-messages.constant';
+import {
+  AUTH_ERRORS,
+  DOCTOR_ERRORS,
+} from '@/common/constants/error-messages.constant';
+import { applyPaginationAndSort } from '@/common/utils/pagination.util';
 
 @Injectable()
 export class DoctorService {
@@ -42,8 +46,7 @@ export class DoctorService {
   async findAllPaginated(
     dto: FindDoctorsDto,
   ): Promise<ResponseCommon<PaginatedResponseDto<Doctor>>> {
-    const { page = 1, limit = 10, search, specialty, hospitalId } = dto;
-    const skip = (page - 1) * limit;
+    const { search, specialty, hospitalId } = dto;
 
     const queryBuilder = this.doctorRepository
       .createQueryBuilder('doctor')
@@ -71,10 +74,17 @@ export class DoctorService {
       });
     }
 
-    // Sắp xếp và phân trang
-    queryBuilder.orderBy('doctor.createdAt', 'DESC').skip(skip).take(limit);
+    applyPaginationAndSort(
+      queryBuilder,
+      dto,
+      ['createdAt', 'specialty', 'practiceStartYear', 'defaultConsultationFee'],
+      'createdAt',
+      'DESC',
+    );
 
     const [items, totalItems] = await queryBuilder.getManyAndCount();
+    const limit = dto.limit || 10;
+    const page = dto.page || 1;
 
     const paginatedData = new PaginatedResponseDto(
       items,
@@ -108,9 +118,7 @@ export class DoctorService {
     if (dto.phone) {
       const vietnamesePhoneRegex = /^(0|\+84)(3|5|7|8|9)[0-9]{8}$/;
       if (!vietnamesePhoneRegex.test(dto.phone)) {
-        throw new BadRequestException(
-          AUTH_ERRORS.INVALID_PHONE_FORMAT,
-        );
+        throw new BadRequestException(AUTH_ERRORS.INVALID_PHONE_FORMAT);
       }
     }
 

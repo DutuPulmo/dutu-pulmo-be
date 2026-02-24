@@ -8,6 +8,7 @@ import { UpdateMedicineDto } from '@/modules/medical/dto/update-medicine.dto';
 import { ResponseCommon } from '@/common/dto/response.dto';
 import { MEDICAL_ERRORS } from '@/common/constants/error-messages.constant';
 import { PaginatedResponseDto } from '@/common/dto/pagination.dto';
+import { applyPaginationAndSort } from '@/common/utils/pagination.util';
 
 @Injectable()
 export class MedicineService {
@@ -32,8 +33,6 @@ export class MedicineService {
     filterDto: FilterMedicineDto,
   ): Promise<ResponseCommon<PaginatedResponseDto<Medicine>>> {
     const queryBuilder = this.medicineRepository.createQueryBuilder('medicine');
-    const page = filterDto.page || 1;
-    const limit = filterDto.limit || 10;
 
     if (filterDto.name) {
       queryBuilder.andWhere('medicine.name ILIKE :name', {
@@ -71,13 +70,18 @@ export class MedicineService {
       });
     }
 
-    queryBuilder
-      .orderBy('medicine.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
+    applyPaginationAndSort(
+      queryBuilder,
+      filterDto,
+      ['createdAt', 'name', 'price', 'quantity', 'group', 'category'],
+      'createdAt',
+      'DESC',
+    );
 
-    const itemCount = await queryBuilder.getCount();
-    const { entities } = await queryBuilder.getRawAndEntities();
+    const [entities, itemCount] = await queryBuilder.getManyAndCount();
+    const limit = filterDto.limit || 10;
+    const page = filterDto.page || 1;
+
     const responseData = new PaginatedResponseDto(
       entities,
       itemCount,

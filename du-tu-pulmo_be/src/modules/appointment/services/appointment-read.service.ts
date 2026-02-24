@@ -22,6 +22,7 @@ import { APPOINTMENT_BASE_RELATIONS } from '@/modules/appointment/appointment.co
 import { AppointmentMapperService } from '@/modules/appointment/services/appointment-mapper.service';
 
 import { MedicalRecord } from '@/modules/medical/entities/medical-record.entity';
+import { applyPaginationAndSort } from '@/common/utils/pagination.util';
 
 @Injectable()
 export class AppointmentReadService {
@@ -36,40 +37,50 @@ export class AppointmentReadService {
   async findAll(
     query?: AppointmentQueryDto,
   ): Promise<ResponseCommon<PaginatedAppointmentResponseDto>> {
-    const page = query?.page || 1;
-    const limit = query?.limit || 10;
-    const skip = (page - 1) * limit;
-
-    const where: FindOptionsWhere<Appointment> = {};
+    const qb = this.appointmentRepository
+      .createQueryBuilder('appointment')
+      .leftJoinAndSelect('appointment.patient', 'patient')
+      .leftJoinAndSelect('patient.user', 'patientUser')
+      .leftJoinAndSelect('appointment.doctor', 'doctor')
+      .leftJoinAndSelect('doctor.user', 'doctorUser');
 
     if (query?.status) {
-      where.status = query.status;
+      qb.andWhere('appointment.status = :status', { status: query.status });
     }
 
     if (query?.appointmentType) {
-      where.appointmentType = query.appointmentType;
+      qb.andWhere('appointment.appointmentType = :appointmentType', {
+        appointmentType: query.appointmentType,
+      });
     }
 
     if (query?.startDate && query?.endDate) {
-      where.scheduledAt = Between(
-        new Date(query.startDate),
-        new Date(query.endDate),
-      );
+      qb.andWhere('appointment.scheduledAt BETWEEN :startDate AND :endDate', {
+        startDate: new Date(query.startDate),
+        endDate: new Date(query.endDate),
+      });
     } else if (query?.startDate) {
-      where.scheduledAt = MoreThanOrEqual(new Date(query.startDate));
+      qb.andWhere('appointment.scheduledAt >= :startDate', {
+        startDate: new Date(query.startDate),
+      });
     } else if (query?.endDate) {
-      where.scheduledAt = LessThanOrEqual(new Date(query.endDate));
+      qb.andWhere('appointment.scheduledAt <= :endDate', {
+        endDate: new Date(query.endDate),
+      });
     }
 
-    const [appointments, totalItems] =
-      await this.appointmentRepository.findAndCount({
-        where,
-        relations: APPOINTMENT_BASE_RELATIONS,
-        order: { scheduledAt: 'DESC' },
-        skip,
-        take: limit,
-      });
+    // Apply pagination and sort mapping
+    applyPaginationAndSort(
+      qb,
+      query || {},
+      ['scheduledAt', 'createdAt', 'status', 'appointmentType'],
+      'scheduledAt',
+      'DESC',
+    );
 
+    const [appointments, totalItems] = await qb.getManyAndCount();
+    const limit = query?.limit || 10;
+    const page = query?.page || 1;
     const totalPages = Math.ceil(totalItems / limit);
 
     return new ResponseCommon(200, 'SUCCESS', {
@@ -113,36 +124,45 @@ export class AppointmentReadService {
     patientId: string,
     query?: PatientAppointmentQueryDto,
   ): Promise<ResponseCommon<PaginatedAppointmentResponseDto>> {
-    const page = query?.page || 1;
-    const limit = query?.limit || 10;
-    const skip = (page - 1) * limit;
-
-    const where: FindOptionsWhere<Appointment> = { patientId };
+    const qb = this.appointmentRepository
+      .createQueryBuilder('appointment')
+      .leftJoinAndSelect('appointment.patient', 'patient')
+      .leftJoinAndSelect('patient.user', 'patientUser')
+      .leftJoinAndSelect('appointment.doctor', 'doctor')
+      .leftJoinAndSelect('doctor.user', 'doctorUser')
+      .where('appointment.patientId = :patientId', { patientId });
 
     if (query?.status) {
-      where.status = query.status;
+      qb.andWhere('appointment.status = :status', { status: query.status });
     }
 
     if (query?.startDate && query?.endDate) {
-      where.scheduledAt = Between(
-        new Date(query.startDate),
-        new Date(query.endDate),
-      );
+      qb.andWhere('appointment.scheduledAt BETWEEN :startDate AND :endDate', {
+        startDate: new Date(query.startDate),
+        endDate: new Date(query.endDate),
+      });
     } else if (query?.startDate) {
-      where.scheduledAt = MoreThanOrEqual(new Date(query.startDate));
+      qb.andWhere('appointment.scheduledAt >= :startDate', {
+        startDate: new Date(query.startDate),
+      });
     } else if (query?.endDate) {
-      where.scheduledAt = LessThanOrEqual(new Date(query.endDate));
+      qb.andWhere('appointment.scheduledAt <= :endDate', {
+        endDate: new Date(query.endDate),
+      });
     }
 
-    const [appointments, totalItems] =
-      await this.appointmentRepository.findAndCount({
-        where,
-        relations: APPOINTMENT_BASE_RELATIONS,
-        order: { scheduledAt: 'DESC' },
-        skip,
-        take: limit,
-      });
+    // Apply pagination and sort mapping
+    applyPaginationAndSort(
+      qb,
+      query || {},
+      ['scheduledAt', 'createdAt', 'status'],
+      'scheduledAt',
+      'DESC',
+    );
 
+    const [appointments, totalItems] = await qb.getManyAndCount();
+    const limit = query?.limit || 10;
+    const page = query?.page || 1;
     const totalPages = Math.ceil(totalItems / limit);
 
     return new ResponseCommon(200, 'SUCCESS', {
@@ -162,36 +182,45 @@ export class AppointmentReadService {
     doctorId: string,
     query?: PatientAppointmentQueryDto,
   ): Promise<ResponseCommon<PaginatedAppointmentResponseDto>> {
-    const page = query?.page || 1;
-    const limit = query?.limit || 10;
-    const skip = (page - 1) * limit;
-
-    const where: FindOptionsWhere<Appointment> = { doctorId };
+    const qb = this.appointmentRepository
+      .createQueryBuilder('appointment')
+      .leftJoinAndSelect('appointment.patient', 'patient')
+      .leftJoinAndSelect('patient.user', 'patientUser')
+      .leftJoinAndSelect('appointment.doctor', 'doctor')
+      .leftJoinAndSelect('doctor.user', 'doctorUser')
+      .where('appointment.doctorId = :doctorId', { doctorId });
 
     if (query?.status) {
-      where.status = query.status;
+      qb.andWhere('appointment.status = :status', { status: query.status });
     }
 
     if (query?.startDate && query?.endDate) {
-      where.scheduledAt = Between(
-        new Date(query.startDate),
-        new Date(query.endDate),
-      );
+      qb.andWhere('appointment.scheduledAt BETWEEN :startDate AND :endDate', {
+        startDate: new Date(query.startDate),
+        endDate: new Date(query.endDate),
+      });
     } else if (query?.startDate) {
-      where.scheduledAt = MoreThanOrEqual(new Date(query.startDate));
+      qb.andWhere('appointment.scheduledAt >= :startDate', {
+        startDate: new Date(query.startDate),
+      });
     } else if (query?.endDate) {
-      where.scheduledAt = LessThanOrEqual(new Date(query.endDate));
+      qb.andWhere('appointment.scheduledAt <= :endDate', {
+        endDate: new Date(query.endDate),
+      });
     }
 
-    const [appointments, totalItems] =
-      await this.appointmentRepository.findAndCount({
-        where,
-        relations: APPOINTMENT_BASE_RELATIONS,
-        order: { scheduledAt: 'DESC' },
-        skip,
-        take: limit,
-      });
+    // Apply pagination and sort mapping
+    applyPaginationAndSort(
+      qb,
+      query || {},
+      ['scheduledAt', 'createdAt', 'status'],
+      'scheduledAt',
+      'DESC',
+    );
 
+    const [appointments, totalItems] = await qb.getManyAndCount();
+    const limit = query?.limit || 10;
+    const page = query?.page || 1;
     const totalPages = Math.ceil(totalItems / limit);
 
     return new ResponseCommon(200, 'SUCCESS', {

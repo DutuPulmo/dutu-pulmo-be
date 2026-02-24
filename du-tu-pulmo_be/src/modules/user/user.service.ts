@@ -10,7 +10,8 @@ import { Doctor } from '@/modules/doctor/entities/doctor.entity';
 import { Patient } from '@/modules/patient/entities/patient.entity';
 import { UserQueryDto } from '@/modules/user/dto/user-query.dto';
 import { UserResponseDto } from '@/modules/user/dto/user-response.dto';
-import { CloudinaryService } from '@/modules/cloudinary/cloudinary.service';
+import { CloudinaryService } from '@/modules/cloudinary';
+import { applyPaginationAndSort } from '@/common/utils/pagination.util';
 
 @Injectable()
 export class UserService {
@@ -22,7 +23,7 @@ export class UserService {
     @InjectRepository(Patient)
     private patientRepository: Repository<Patient>,
 
-    private readonly cloudinaryService: CloudinaryService
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   async findAll(query?: UserQueryDto): Promise<
@@ -38,10 +39,6 @@ export class UserService {
       };
     }>
   > {
-    const page = query?.page || 1;
-    const limit = query?.limit || 10;
-    const skip = (page - 1) * limit;
-
     // Build query with search
     let queryBuilder = this.userRepository
       .createQueryBuilder('user')
@@ -69,15 +66,17 @@ export class UserService {
       });
     }
 
-    // Get total count and apply pagination
-    const totalItems = await queryBuilder.getCount();
+    applyPaginationAndSort(
+      queryBuilder,
+      query || {},
+      ['createdAt', 'fullName', 'phone', 'status'],
+      'createdAt',
+      'DESC',
+    );
 
-    const users = await queryBuilder
-      .orderBy('user.createdAt', 'DESC')
-      .skip(skip)
-      .take(limit)
-      .getMany();
-
+    const [users, totalItems] = await queryBuilder.getManyAndCount();
+    const limit = query?.limit || 10;
+    const page = query?.page || 1;
     const totalPages = Math.ceil(totalItems / limit);
 
     return new ResponseCommon(200, 'SUCCESS', {
@@ -149,7 +148,6 @@ export class UserService {
     });
   }
 
-
   async updateAvatar(userId: string, file: Express.Multer.File) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
@@ -174,5 +172,4 @@ export class UserService {
       upload: uploaded,
     };
   }
-
 }
