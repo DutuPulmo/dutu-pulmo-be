@@ -125,13 +125,13 @@ export class ChatGateway
       const payload = payloadUnknown as Record<string, unknown>;
       const email =
         typeof payload.email === 'string' ? payload.email : undefined;
-      const sub = typeof payload.sub === 'string' ? payload.sub : undefined;
-      const id = typeof payload.id === 'string' ? payload.id : undefined;
+      const userId =
+        typeof payload.userId === 'string' ? payload.userId : undefined;
       const fullName =
         typeof payload.fullName === 'string' ? payload.fullName : undefined;
       const name = typeof payload.name === 'string' ? payload.name : undefined;
       const user: UserInfo = {
-        id: sub || id || '',
+        id: userId || '',
         email: email ?? '',
         fullName: fullName || name || email?.split('@')[0] || '',
       };
@@ -309,7 +309,6 @@ export class ChatGateway
       this.clearUserTypingInRoom(chatroomId, user.id);
     }
 
-    this.logger.log(`User "${user.fullName}" is typing in room ${chatroomId}`);
     client.to(chatroomId).emit('user-typing', {
       chatroomId,
       users: Array.from(typingInRoom.values()),

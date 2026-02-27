@@ -13,6 +13,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ChatMessageService } from '@/modules/chatmessage/chatmessage.service';
+import type { CreateChatMessageInternal } from '@/modules/chatmessage/chatmessage.service';
 import { CreateChatMessageDto } from '@/modules/chatmessage/dto/create-chatmessage.dto';
 import { UpdateChatMessageDto } from '@/modules/chatmessage/dto/update-chatmessage.dto';
 import {
@@ -60,20 +61,22 @@ export class ChatMessageController {
   ): Promise<ResponseCommon<ChatMessageResponseDto>> {
     const isMember = await this.chatRoomService.isUserMemberOfChatRoom(
       createChatMessageDto.chatroomId,
-      user.id,
+      user.userId,
     );
     if (!isMember) {
       throw new ForbiddenException(ERROR_MESSAGES.NOT_MEMBER);
     }
 
-    const response = await this.chatMessageService.create({
-      ...createChatMessageDto,
-      senderId: user.id,
-    });
+    const createPayload: CreateChatMessageInternal = {
+      chatroomId: createChatMessageDto.chatroomId,
+      content: createChatMessageDto.content,
+      senderId: user.userId,
+    };
+
+    const response = await this.chatMessageService.create(createPayload);
 
     const dto = ChatMessageMapper.toDto(response.data!);
 
-    // Emit realtime event tới room
     if (response.data) {
       this.chatGateway.emitMessageToRoom(createChatMessageDto.chatroomId, dto);
     }
@@ -111,7 +114,7 @@ export class ChatMessageController {
     if (!user.roles?.includes('ADMIN')) {
       const isMember = await this.chatRoomService.isUserMemberOfChatRoom(
         chatroomId,
-        user.id,
+        user.userId,
       );
       if (!isMember) {
         throw new ForbiddenException(ERROR_MESSAGES.NOT_MEMBER);
@@ -153,7 +156,7 @@ export class ChatMessageController {
       if (chatroomId) {
         const isMember = await this.chatRoomService.isUserMemberOfChatRoom(
           chatroomId,
-          user.id,
+          user.userId,
         );
         if (!isMember) {
           throw new ForbiddenException(ERROR_MESSAGES.NOT_MEMBER);
@@ -186,7 +189,10 @@ export class ChatMessageController {
       throw new NotFoundException(ERROR_MESSAGES.MESSAGE_NOT_FOUND);
     }
 
-    if (!user.roles?.includes('ADMIN') && message.data.sender?.id !== user.id) {
+    if (
+      !user.roles?.includes('ADMIN') &&
+      message.data.sender?.id !== user.userId
+    ) {
       throw new ForbiddenException(ERROR_MESSAGES.NOT_SENDER);
     }
 
@@ -222,7 +228,10 @@ export class ChatMessageController {
       throw new NotFoundException(ERROR_MESSAGES.MESSAGE_NOT_FOUND);
     }
 
-    if (!user.roles?.includes('ADMIN') && message.data.sender?.id !== user.id) {
+    if (
+      !user.roles?.includes('ADMIN') &&
+      message.data.sender?.id !== user.userId
+    ) {
       throw new ForbiddenException(ERROR_MESSAGES.NOT_SENDER);
     }
 
