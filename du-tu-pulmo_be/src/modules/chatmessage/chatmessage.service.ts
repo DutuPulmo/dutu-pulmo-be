@@ -2,11 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ChatMessage } from '@/modules/chatmessage/entities/chatmessage.entity';
-import { CreateChatMessageDto } from '@/modules/chatmessage/dto/create-chatmessage.dto';
 import { UpdateChatMessageDto } from '@/modules/chatmessage/dto/update-chatmessage.dto';
 import { ResponseCommon } from '@/common/dto/response.dto';
 
 const MESSAGE_RELATIONS = ['chatroom', 'sender', 'sender.account'];
+
+export type CreateChatMessageInternal = {
+  chatroomId: string;
+  content: string;
+  senderId: string;
+};
 
 @Injectable()
 export class ChatMessageService {
@@ -16,7 +21,7 @@ export class ChatMessageService {
   ) {}
 
   async create(
-    createChatMessageDto: CreateChatMessageDto,
+    createChatMessageDto: CreateChatMessageInternal,
   ): Promise<ResponseCommon<ChatMessage>> {
     const { chatroomId, senderId, content } = createChatMessageDto;
 

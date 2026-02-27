@@ -79,7 +79,7 @@ export class ChatRoomController {
   async getMyChats(
     @CurrentUser() user: JwtUser,
   ): Promise<ResponseCommon<ChatRoomResponseDto[]>> {
-    const response = await this.chatRoomService.findByCurrentUser(user.id);
+    const response = await this.chatRoomService.findByCurrentUser(user.userId);
     const data = (response.data ?? []).map((room) =>
       ChatRoomResponseDto.fromEntity(room),
     );
@@ -110,7 +110,7 @@ export class ChatRoomController {
     if (!user.roles?.includes('ADMIN')) {
       const isMember = await this.chatRoomService.isUserMemberOfChatRoom(
         id,
-        user.id,
+        user.userId,
       );
       if (!isMember) {
         throw new ForbiddenException(ERROR_MESSAGES.NOT_MEMBER);

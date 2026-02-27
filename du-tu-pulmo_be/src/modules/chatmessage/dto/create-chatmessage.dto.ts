@@ -18,6 +18,4 @@ export class CreateChatMessageDto {
   })
   content: string;
 
-  // senderId được inject từ JWT token ở controller, không nhận từ request body
-  senderId?: string;
 }
