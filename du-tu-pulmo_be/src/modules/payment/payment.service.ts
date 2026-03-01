@@ -205,10 +205,6 @@ export class PaymentService {
     if (!payment) {
       throw new NotFoundException(ERROR_MESSAGES.PAYMENT_NOT_FOUND);
     }
-    void this.cancelPaymentByAppointmentId(payment.appointmentId, '');
-    if (!payment) {
-      throw new NotFoundException(ERROR_MESSAGES.PAYMENT_NOT_FOUND);
-    }
 
     return this.toDto(payment);
   }
@@ -663,7 +659,6 @@ export class PaymentService {
     let count = 0;
 
     for (const payment of oldPayments) {
-      // TODO: Move to archive table when implemented
       // await this.archivedPaymentRepository.save(payment);
       // await this.paymentRepository.remove(payment);
 
