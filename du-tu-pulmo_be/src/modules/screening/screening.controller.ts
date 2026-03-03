@@ -386,6 +386,12 @@ export class ScreeningController {
 
     if (!user.roles?.includes('ADMIN')) {
       if (
+        user.roles?.includes('DOCTOR') &&
+        screening.uploadedByDoctorId !== user.doctorId
+      ) {
+        throw new ForbiddenException(ERROR_MESSAGES.ACCESS_DENIED_SCREENING);
+      }
+      if (
         user.roles?.includes('PATIENT') &&
         screening.patientId !== user.patientId
       ) {
@@ -417,6 +423,12 @@ export class ScreeningController {
     const screening = await this.screeningService.findById(screeningId);
 
     if (!user.roles?.includes('ADMIN')) {
+      if (
+        user.roles?.includes('DOCTOR') &&
+        screening.uploadedByDoctorId !== user.doctorId
+      ) {
+        throw new ForbiddenException(ERROR_MESSAGES.ACCESS_DENIED_SCREENING);
+      }
       if (
         user.roles?.includes('PATIENT') &&
         screening.patientId !== user.patientId
@@ -451,6 +463,12 @@ export class ScreeningController {
     );
 
     if (!user.roles?.includes('ADMIN')) {
+      if (
+        user.roles?.includes('DOCTOR') &&
+        screening.uploadedByDoctorId !== user.doctorId
+      ) {
+        throw new ForbiddenException(ERROR_MESSAGES.ACCESS_DENIED_SCREENING);
+      }
       if (
         user.roles?.includes('PATIENT') &&
         screening.patientId !== user.patientId
@@ -518,6 +536,12 @@ export class ScreeningController {
     const screening = await this.screeningService.findById(screeningId);
 
     if (!user.roles?.includes('ADMIN')) {
+      if (
+        user.roles?.includes('DOCTOR') &&
+        screening.uploadedByDoctorId !== user.doctorId
+      ) {
+        throw new ForbiddenException(ERROR_MESSAGES.ACCESS_DENIED_SCREENING);
+      }
       if (
         user.roles?.includes('PATIENT') &&
         screening.patientId !== user.patientId
@@ -594,13 +618,8 @@ export class ScreeningController {
 
     if (!file) throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
 
-    const patientResponse = patientId
-      ? await this.patientService.findOne(patientId)
-      : undefined;
-    const patient = patientResponse?.data;
-
-    if (!patient) {
-      throw new NotFoundException(ERROR_MESSAGES.PATIENT_NOT_FOUND);
+    if (!screeningId && !patientId) {
+      throw new BadRequestException(ERROR_MESSAGES.MISSING_PATIENT_ID);
     }
 
     const screening = screeningId
@@ -611,7 +630,8 @@ export class ScreeningController {
           medicalRecordId: medicalRecordId,
         });
 
-    if (!screeningId && !patientId) {
+    const resolvedPatientId = patientId || screening.patientId;
+    if (!resolvedPatientId) {
       throw new BadRequestException(ERROR_MESSAGES.MISSING_PATIENT_ID);
     }
 
@@ -620,6 +640,12 @@ export class ScreeningController {
       if (!canOperate) {
         throw new ForbiddenException(ERROR_MESSAGES.ACCESS_DENIED_SCREENING);
       }
+    }
+
+    const patientResponse = await this.patientService.findOne(resolvedPatientId);
+    const patient = patientResponse?.data;
+    if (!patient) {
+      throw new NotFoundException(ERROR_MESSAGES.PATIENT_NOT_FOUND);
     }
 
     // 2) Validate file
