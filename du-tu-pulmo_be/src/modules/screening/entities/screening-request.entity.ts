@@ -32,12 +32,12 @@ export class ScreeningRequest {
   @Column({ name: 'patient_id', type: 'uuid' })
   patientId: string;
 
-  @ManyToOne(() => MedicalRecord, { onDelete: 'CASCADE' })
+  @ManyToOne(() => MedicalRecord, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'medical_record_id' })
   medicalRecord: MedicalRecord;
 
   @Index()
-  @Column({ name: 'medical_record_id', type: 'uuid' })
+  @Column({ name: 'medical_record_id', type: 'uuid', nullable: true })
   medicalRecordId: string;
 
   @ManyToOne(() => Doctor, { onDelete: 'SET NULL', nullable: true })
