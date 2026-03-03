@@ -95,7 +95,7 @@ export class DoctorService {
   async findOne(id: string): Promise<ResponseCommon<Doctor | null>> {
     const doctor = await this.doctorRepository.findOne({
       where: { id },
-      relations: ['user', 'primaryHospital'],
+      relations: ['user', 'primaryHospital', 'user.account'],
     });
     return new ResponseCommon(200, 'SUCCESS', doctor);
   }

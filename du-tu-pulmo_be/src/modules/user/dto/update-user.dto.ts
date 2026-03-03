@@ -12,6 +12,7 @@ import { GenderEnum } from '@/modules/common/enums/gender.enum';
 import { CountryEnum } from '@/modules/common/enums/country.enum';
 import { EthnicityEnum } from '@/modules/common/enums/ethnicity.enum';
 import { OccupationEnum } from '@/modules/common/enums/job.enum';
+import { Transform } from 'class-transformer';
 
 export class UpdateUserDto {
   @ApiPropertyOptional({
@@ -31,6 +32,7 @@ export class UpdateUserDto {
   })
   @IsOptional()
   @IsString({ message: 'Số điện thoại phải là chuỗi' })
+  @Transform(({ value }) => value?.replace(/[\s.-]/g, ''))
   @Matches(/^(0|\+84)(3|5|7|8|9)[0-9]{8}$/, {
     message: 'Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam',
   })

@@ -623,8 +623,6 @@ export class AuthService {
       });
 
       if (!account) {
-        // Security: Don't reveal if email exists or not
-        // Still return success to prevent user enumeration
         return new ResponseCommon(200, 'SUCCESS', {
           message:
             'Nếu email tồn tại trong hệ thống, bạn sẽ nhận được link reset mật khẩu.',
@@ -643,7 +641,6 @@ export class AuthService {
       }
 
       // Step 5: Check if there's already a recent token (rate limiting)
-      // Prevent spam by checking if token was generated recently
       if (account.resetPasswordToken) {
         try {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -702,7 +699,6 @@ export class AuthService {
       });
     } catch (error) {
       this.logger.error('Send forgot password email error:', error);
-      // Return generic error, don't expose details
       return new ResponseCommon(200, 'SUCCESS', {
         message:
           'Nếu email tồn tại trong hệ thống, bạn sẽ nhận được link reset mật khẩu.',

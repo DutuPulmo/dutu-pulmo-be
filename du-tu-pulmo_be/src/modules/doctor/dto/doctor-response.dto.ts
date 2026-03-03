@@ -31,6 +31,13 @@ export class DoctorResponseDto {
   })
   phone?: string;
 
+  // email
+  @ApiPropertyOptional({
+    example: 'nguyenvana@gmail.com',
+    description: 'Email',
+  })
+  email?: string;
+
   @ApiPropertyOptional({
     example: '1990-01-15',
     description: 'Ngày sinh',
@@ -237,6 +244,9 @@ export class DoctorResponseDto {
       province?: string;
       ward?: string;
       address?: string;
+      account?: {
+        email?: string;
+      };
     };
     practiceStartYear?: number;
     licenseNumber: string;
@@ -272,6 +282,7 @@ export class DoctorResponseDto {
     dto.userId = doctor.userId;
     dto.fullName = doctor.user?.fullName;
     dto.phone = doctor.user?.phone;
+    dto.email = doctor.user?.account?.email;
     dto.dateOfBirth = doctor.user?.dateOfBirth;
     dto.gender = doctor.user?.gender;
     dto.avatarUrl = doctor.user?.avatarUrl;
