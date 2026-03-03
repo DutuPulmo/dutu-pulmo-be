@@ -46,6 +46,12 @@ export class NotificationService {
     };
   }
 
+  async getUnreadCount(userId: string): Promise<number> {
+    return this.notificationRepository.count({
+      where: { userId, status: StatusEnum.PENDING },
+    });
+  }
+
   /**
    * Đánh dấu 1 thông báo là đã đọc
    */

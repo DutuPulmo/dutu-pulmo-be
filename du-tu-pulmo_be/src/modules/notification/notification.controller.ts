@@ -20,6 +20,7 @@ import { CurrentUser } from '@/common/decorators/user.decorator';
 import type { JwtUser } from '@/modules/core/auth/strategies/jwt.strategy';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { NotificationResponseDto } from './dto/notification-response.dto';
+import { ResponseCommon } from '@/common/dto/response.dto';
 
 @ApiTags('Notifications')
 @ApiBearerAuth()
@@ -40,7 +41,20 @@ export class NotificationController {
     @CurrentUser() user: JwtUser,
     @Query() query: PaginationDto,
   ) {
-    return this.notificationService.findUserNotifications(user.id, query);
+    return this.notificationService.findUserNotifications(user.userId, query);
+  }
+
+  @Get('unread-count')
+  @ApiOperation({ summary: 'Lấy số lượng thông báo chưa đọc của user hiện tại' })
+  @ApiResponse({
+    status: 200,
+    description: 'Số lượng thông báo chưa đọc',
+  })
+  async getUnreadCount(
+    @CurrentUser() user: JwtUser,
+  ): Promise<ResponseCommon<{ count: number }>> {
+    const count = await this.notificationService.getUnreadCount(user.userId);
+    return new ResponseCommon(200, 'SUCCESS', { count });
   }
 
   @Patch('read-all')
@@ -51,7 +65,7 @@ export class NotificationController {
     description: 'Thành công',
   })
   async markAllAsRead(@CurrentUser() user: JwtUser) {
-    const success = await this.notificationService.markAllAsRead(user.id);
+    const success = await this.notificationService.markAllAsRead(user.userId);
     return {
       success,
       message: 'Đã đánh dấu tất cả là đã đọc',
@@ -66,7 +80,7 @@ export class NotificationController {
     description: 'Thành công',
   })
   async markAsRead(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    const success = await this.notificationService.markAsRead(user.id, id);
+    const success = await this.notificationService.markAsRead(user.userId, id);
     return {
       success,
       message: success
