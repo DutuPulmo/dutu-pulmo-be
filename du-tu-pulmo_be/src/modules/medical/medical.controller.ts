@@ -327,6 +327,35 @@ export class MedicalController {
     return this.medicalService.signMedicalRecord(id, dto, user);
   }
 
+  @Post('records/:id/complete')
+  @Roles(RoleEnum.DOCTOR, RoleEnum.ADMIN)
+  @ApiOperation({
+    summary: 'Hoàn tất bệnh án (không thể chỉnh sửa sau khi complete)',
+  })
+  @ApiParam({ name: 'id', description: 'Medical Record ID (UUID)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Hoàn tất thành công' })
+  async completeMedicalRecord(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtUser,
+  ): Promise<ResponseCommon<MedicalRecord>> {
+    return this.medicalService.completeMedicalRecord(id, user);
+  }
+
+  @Post('records/:id/reopen')
+  @Roles(RoleEnum.DOCTOR, RoleEnum.ADMIN)
+  @ApiOperation({
+    summary:
+      'Mở lại bệnh án đã COMPLETED. DOCTOR: chỉ trong 48h và chính chủ. ADMIN: không giới hạn.',
+  })
+  @ApiParam({ name: 'id', description: 'Medical Record ID (UUID)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Mở lại thành công' })
+  async reopenMedicalRecord(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtUser,
+  ): Promise<ResponseCommon<MedicalRecord>> {
+    return this.medicalService.reopenMedicalRecord(id, user);
+  }
+
   // ==================== Specialized Views ====================
 
   @Get('records/:id/examination')

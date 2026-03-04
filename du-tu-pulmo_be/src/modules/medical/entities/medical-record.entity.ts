@@ -179,6 +179,9 @@ export class MedicalRecord {
   })
   status: MedicalRecordStatusEnum;
 
+  @Column({ name: 'completed_at', type: 'timestamptz', nullable: true })
+  completedAt: Date | null;
+
   @CreateDateColumn({
     name: 'created_at',
     type: 'timestamptz',

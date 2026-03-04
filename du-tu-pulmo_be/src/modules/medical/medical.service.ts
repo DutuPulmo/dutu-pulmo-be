@@ -29,9 +29,21 @@ import { UpdateMedicalRecordDto } from '@/modules/medical/dto/update-medical-rec
 import { SignMedicalRecordDto } from '@/modules/medical/dto/sign-medical-record.dto';
 import { AppointmentStatusEnum } from '@/modules/common/enums/appointment-status.enum';
 import { PrescriptionStatusEnum } from '@/modules/common/enums/prescription-status.enum';
+import { MedicalRecordStatusEnum } from '@/modules/common/enums/medical-record-status.enum';
 import { ERROR_MESSAGES } from '@/common/constants/error-messages.constant';
 import { MedicalRecordExaminationDto } from '@/modules/medical/dto/medical-record-examination.dto';
 import { PdfService } from '@/modules/pdf/pdf.service';
+
+const VALID_TRANSITIONS: Record<MedicalRecordStatusEnum, MedicalRecordStatusEnum[]> = {
+  [MedicalRecordStatusEnum.DRAFT]: [
+    MedicalRecordStatusEnum.IN_PROGRESS,
+    MedicalRecordStatusEnum.COMPLETED,
+  ],
+  [MedicalRecordStatusEnum.IN_PROGRESS]: [MedicalRecordStatusEnum.COMPLETED],
+  [MedicalRecordStatusEnum.COMPLETED]: [MedicalRecordStatusEnum.IN_PROGRESS],
+};
+
+const REOPEN_WINDOW_HOURS = 48;
 
 @Injectable()
 export class MedicalService {
@@ -144,11 +156,96 @@ export class MedicalService {
       throw new NotFoundException(ERROR_MESSAGES.MEDICAL_RECORD_NOT_FOUND);
     }
 
+    this.assertNotCompleted(record);
+
     Object.assign(record, data);
 
     const result = await this.recordRepository.save(record);
 
     return new ResponseCommon(HttpStatus.OK, 'Cập nhật thành công', result);
+  }
+
+  async completeMedicalRecord(
+    id: string,
+    user: JwtUser,
+  ): Promise<ResponseCommon<MedicalRecord>> {
+    const record = await this.recordRepository.findOne({ where: { id } });
+    if (!record) {
+      throw new NotFoundException(ERROR_MESSAGES.MEDICAL_RECORD_NOT_FOUND);
+    }
+
+    if (
+      user.roles?.includes(RoleEnum.DOCTOR) &&
+      !user.roles.includes(RoleEnum.ADMIN)
+    ) {
+      if (record.doctorId !== user.doctorId) {
+        throw new ForbiddenException(ERROR_MESSAGES.ACCESS_DENIED_MEDICAL);
+      }
+    }
+
+    this.validateTransition(record.status, MedicalRecordStatusEnum.COMPLETED);
+
+    record.status = MedicalRecordStatusEnum.COMPLETED;
+    record.completedAt = new Date();
+
+    const result = await this.recordRepository.save(record);
+    return new ResponseCommon(HttpStatus.OK, 'Bệnh án đã được hoàn tất', result);
+  }
+
+  async reopenMedicalRecord(
+    id: string,
+    user: JwtUser,
+  ): Promise<ResponseCommon<MedicalRecord>> {
+    const record = await this.recordRepository.findOne({ where: { id } });
+    if (!record) {
+      throw new NotFoundException(ERROR_MESSAGES.MEDICAL_RECORD_NOT_FOUND);
+    }
+
+    this.validateTransition(record.status, MedicalRecordStatusEnum.IN_PROGRESS);
+
+    if (
+      user.roles?.includes(RoleEnum.DOCTOR) &&
+      !user.roles.includes(RoleEnum.ADMIN)
+    ) {
+      if (record.doctorId !== user.doctorId) {
+        throw new ForbiddenException(ERROR_MESSAGES.REOPEN_FORBIDDEN);
+      }
+
+      const completedAt = record.completedAt;
+      if (!completedAt) {
+        throw new BadRequestException(ERROR_MESSAGES.REOPEN_WINDOW_EXPIRED);
+      }
+
+      const hoursSinceCompleted =
+        (Date.now() - completedAt.getTime()) / (1000 * 60 * 60);
+      if (hoursSinceCompleted > REOPEN_WINDOW_HOURS) {
+        throw new ForbiddenException(ERROR_MESSAGES.REOPEN_WINDOW_EXPIRED);
+      }
+    }
+
+    record.status = MedicalRecordStatusEnum.IN_PROGRESS;
+    record.completedAt = null;
+
+    const result = await this.recordRepository.save(record);
+    return new ResponseCommon(HttpStatus.OK, 'Bệnh án đã được mở lại', result);
+  }
+
+  private assertNotCompleted(record: MedicalRecord): void {
+    if (record.status === MedicalRecordStatusEnum.COMPLETED) {
+      throw new BadRequestException(ERROR_MESSAGES.MEDICAL_RECORD_COMPLETED);
+    }
+  }
+
+  private validateTransition(
+    from: MedicalRecordStatusEnum,
+    to: MedicalRecordStatusEnum,
+  ): void {
+    const allowed = VALID_TRANSITIONS[from];
+    if (!allowed.includes(to)) {
+      throw new BadRequestException(
+        ERROR_MESSAGES.INVALID_RECORD_STATUS_TRANSITION,
+      );
+    }
   }
 
   // ============================================================================
@@ -495,6 +592,14 @@ export class MedicalService {
     patientId: string,
     data: Partial<VitalSign>,
   ): Promise<ResponseCommon<VitalSign>> {
+    const record = await this.recordRepository.findOne({
+      where: { id: encounterId },
+    });
+    if (!record) {
+      throw new NotFoundException(ERROR_MESSAGES.MEDICAL_RECORD_NOT_FOUND);
+    }
+    this.assertNotCompleted(record);
+
     const vitalSign = this.vitalSignRepository.create({
       ...data,
       patientId,
@@ -528,6 +633,14 @@ export class MedicalService {
       }>;
     },
   ): Promise<ResponseCommon<Prescription>> {
+    const record = await this.recordRepository.findOne({
+      where: { id: encounterId },
+    });
+    if (!record) {
+      throw new NotFoundException(ERROR_MESSAGES.MEDICAL_RECORD_NOT_FOUND);
+    }
+    this.assertNotCompleted(record);
+
     const prescription = this.prescriptionRepository.create({
       prescriptionNumber: this.generatePrescriptionNumber(),
       patientId,
