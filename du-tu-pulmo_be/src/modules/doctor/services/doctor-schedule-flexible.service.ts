@@ -61,6 +61,10 @@ export class DoctorScheduleFlexibleService {
     const dayOfWeek = specificDate.getDay();
     const priority = SCHEDULE_TYPE_PRIORITY[ScheduleType.FLEXIBLE];
 
+    const minDays = dto.minimumBookingDays ?? 0;
+    const maxDays = dto.maxAdvanceBookingDays ?? 30;
+    this.helper.validateBookingDaysConstraints(minDays, maxDays);
+
     if (dto.startTime >= dto.endTime) {
       this.logger.error('Invalid start time or end time');
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
@@ -185,9 +189,7 @@ export class DoctorScheduleFlexibleService {
         slotCapacity: dto.slotCapacity,
         slotDuration: dto.slotDuration,
         appointmentType: dto.appointmentType,
-        minimumBookingTime: dto.minimumBookingDays
-          ? dto.minimumBookingDays * 24 * 60
-          : 60,
+        minimumBookingTime: (dto.minimumBookingDays ?? 0) * 24 * 60,
         maxAdvanceBookingDays: dto.maxAdvanceBookingDays ?? 30,
         consultationFee: dto.consultationFee?.toString() ?? null,
         discountPercent: dto.discountPercent ?? 0,
@@ -291,6 +293,9 @@ export class DoctorScheduleFlexibleService {
       slotDuration: dto.slotDuration,
       appointmentType: dto.appointmentType,
       consultationFee: dto.consultationFee,
+      discountPercent: dto.discountPercent,
+      minimumBookingDays: dto.minimumBookingDays,
+      maxAdvanceBookingDays: dto.maxAdvanceBookingDays,
       isAvailable: dto.isAvailable,
     };
 
@@ -407,6 +412,13 @@ export class DoctorScheduleFlexibleService {
           dto.consultationFee !== undefined
             ? (dto.consultationFee?.toString() ?? null)
             : existing.consultationFee,
+        discountPercent: dto.discountPercent ?? existing.discountPercent,
+        minimumBookingTime:
+          dto.minimumBookingDays !== undefined
+            ? dto.minimumBookingDays * 24 * 60
+            : existing.minimumBookingTime,
+        maxAdvanceBookingDays:
+          dto.maxAdvanceBookingDays ?? existing.maxAdvanceBookingDays,
         isAvailable: dto.isAvailable ?? existing.isAvailable,
       });
 

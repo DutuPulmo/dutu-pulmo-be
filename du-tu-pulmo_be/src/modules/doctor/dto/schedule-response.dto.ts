@@ -70,6 +70,11 @@ export class DoctorScheduleResponseDto {
   maxAdvanceBookingDays: number;
 
   @ApiPropertyOptional({
+    description: 'Số ngày đặt trước tối thiểu',
+  })
+  minimumBookingDays?: number;
+
+  @ApiPropertyOptional({
     example: '500000',
     description:
       'Phí khám riêng cho lịch này (VND). Nếu null sẽ dùng defaultConsultationFee của bác sĩ',
@@ -172,6 +177,7 @@ export class DoctorScheduleResponseDto {
     dto.slotCapacity = schedule.slotCapacity;
     dto.appointmentType = schedule.appointmentType;
     dto.minimumBookingTime = schedule.minimumBookingTime;
+    dto.minimumBookingDays = (schedule.minimumBookingTime ?? 0) / (24 * 60);
     dto.maxAdvanceBookingDays = schedule.maxAdvanceBookingDays;
     dto.consultationFee = schedule.consultationFee ?? null;
     dto.effectiveConsultationFee = schedule.effectiveConsultationFee ?? null;

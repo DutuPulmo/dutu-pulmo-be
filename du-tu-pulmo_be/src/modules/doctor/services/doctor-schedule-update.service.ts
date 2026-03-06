@@ -68,6 +68,10 @@ export class DoctorScheduleUpdateService {
       scheduleType: undefined,
       priority: undefined,
       isAvailable: newIsAvailable,
+      minimumBookingTime:
+        dto.minimumBookingDays !== undefined
+          ? dto.minimumBookingDays * 24 * 60
+          : undefined,
       consultationFee:
         dto.consultationFee !== undefined
           ? (dto.consultationFee?.toString() ?? null)
@@ -85,6 +89,10 @@ export class DoctorScheduleUpdateService {
             : null
           : undefined,
     };
+
+    if ('minimumBookingDays' in updateData) {
+      delete (updateData as any).minimumBookingDays;
+    }
 
     Object.keys(updateData).forEach((key) => {
       if (updateData[key as keyof typeof updateData] === undefined) {

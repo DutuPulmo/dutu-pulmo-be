@@ -280,9 +280,7 @@ export class DoctorScheduleRegularService {
             effectiveUntil: dto.effectiveUntil
               ? new Date(dto.effectiveUntil)
               : null,
-            minimumBookingTime: dto.minimumBookingDays
-              ? dto.minimumBookingDays * 24 * 60
-              : 0,
+            minimumBookingTime: (dto.minimumBookingDays ?? 0) * 24 * 60,
             maxAdvanceBookingDays: dto.maxAdvanceBookingDays ?? 30,
           }),
         );
@@ -343,6 +341,7 @@ export class DoctorScheduleRegularService {
     id: string,
     dto: UpdateDoctorScheduleDto,
   ): Promise<ResponseCommon<DoctorSchedule>> {
+    console.log('updateRegular', id, dto.minimumBookingDays);
     const existing = await this.scheduleRepository.findOne({ where: { id } });
     if (!existing) {
       this.logger.error('Schedule not found');
@@ -421,6 +420,10 @@ export class DoctorScheduleRegularService {
       scheduleType: undefined,
       priority,
       isAvailable: newIsAvailable,
+      minimumBookingTime:
+        dto.minimumBookingDays !== undefined
+          ? dto.minimumBookingDays * 24 * 60
+          : 0,
       consultationFee:
         dto.consultationFee !== undefined
           ? (dto.consultationFee?.toString() ?? null)
@@ -438,6 +441,10 @@ export class DoctorScheduleRegularService {
             : null
           : undefined,
     };
+
+    if ('minimumBookingDays' in updateData) {
+      delete (updateData as any).minimumBookingDays;
+    }
 
     Object.keys(updateData).forEach((key) => {
       if (updateData[key as keyof typeof updateData] === undefined) {
@@ -558,6 +565,9 @@ export class DoctorScheduleRegularService {
             slotCapacity: updateData.slotCapacity,
             appointmentType: updateData.appointmentType,
             consultationFee: updateData.consultationFee,
+            discountPercent: updateData.discountPercent,
+            minimumBookingDays: updateData.minimumBookingDays,
+            maxAdvanceBookingDays: updateData.maxAdvanceBookingDays,
             isAvailable: updateData.isAvailable,
             effectiveFrom: updateData.effectiveFrom,
             effectiveUntil: updateData.effectiveUntil,
@@ -587,6 +597,12 @@ export class DoctorScheduleRegularService {
               updateData.consultationFee !== undefined
                 ? (updateData.consultationFee?.toString() ?? null)
                 : undefined,
+            discountPercent: updateData.discountPercent,
+            minimumBookingTime:
+              updateData.minimumBookingDays !== undefined
+                ? updateData.minimumBookingDays * 24 * 60
+                : undefined,
+            maxAdvanceBookingDays: updateData.maxAdvanceBookingDays,
             isAvailable: updateData.isAvailable,
             effectiveFrom:
               updateData.effectiveFrom !== undefined
@@ -818,6 +834,12 @@ export class DoctorScheduleRegularService {
             dto.consultationFee !== undefined
               ? (dto.consultationFee?.toString() ?? null)
               : undefined,
+          discountPercent: dto.discountPercent,
+          minimumBookingTime:
+            dto.minimumBookingDays !== undefined
+              ? dto.minimumBookingDays * 24 * 60
+              : undefined,
+          maxAdvanceBookingDays: dto.maxAdvanceBookingDays,
           isAvailable: dto.isAvailable,
           effectiveFrom:
             dto.effectiveFrom !== undefined

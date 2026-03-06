@@ -106,7 +106,7 @@ export class TimeSlotService {
           if (slot.startTime < earliestAllowed) return false;
         }
 
-        const maxDays = slot.schedule.maxAdvanceBookingDays ?? 90;
+        const maxDays = slot.schedule.maxAdvanceBookingDays ?? 30;
         const latestAllowed = new Date(
           now.getTime() + maxDays * 24 * 60 * 60 * 1000,
         );
@@ -191,8 +191,7 @@ export class TimeSlotService {
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
     }
 
-    // minimumBookingTime is stored in MINUTES in the DB
-    const minBookingMinutes = doctorSchedule?.minimumBookingTime || 60;
+    const minBookingMinutes = doctorSchedule?.minimumBookingTime ?? 0;
     const minBookingBufferMs = minBookingMinutes * 60 * 1000;
     const earliestAllowed = new Date(now.getTime() + minBookingBufferMs);
 
@@ -201,7 +200,7 @@ export class TimeSlotService {
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
     }
 
-    const maxAdvanceDays = doctorSchedule?.maxAdvanceBookingDays || 90;
+    const maxAdvanceDays = doctorSchedule?.maxAdvanceBookingDays ?? 30;
     const maxDate = new Date(
       now.getTime() + maxAdvanceDays * 24 * 60 * 60 * 1000,
     );
