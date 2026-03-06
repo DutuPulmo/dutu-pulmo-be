@@ -114,7 +114,6 @@ export class NotificationController {
     @Body('title') title: string,
     @Body('content') content: string,
   ) {
-    console.log(user);
     const notification = await this.notificationService.createNotification({
       userId: user.userId,
       title: title || 'Test Push E2E',

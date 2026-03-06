@@ -69,8 +69,12 @@ export class PushNotificationService {
     try {
       const message: admin.messaging.Message = {
         token,
-        notification: { title: payload.title, body: payload.body },
-        data: payload.data,
+        // notification: { title: payload.title, body: payload.body },
+        data: {
+          title: payload.title,
+          body: payload.body,
+          ...(payload.data || {})
+        } 
       };
       const response = await admin.messaging().send(message);
       this.logger.log(`Successfully sent message to device: ${response}`);
@@ -92,11 +96,15 @@ export class PushNotificationService {
     try {
       const message: admin.messaging.MulticastMessage = {
         tokens,
-        notification: {
+        // notification: {
+        //   title: payload.title,
+        //   body: payload.body,
+        // },
+        data: {
           title: payload.title,
           body: payload.body,
-        },
-        data: payload.data,
+          ...(payload.data || {})
+        } 
       };
 
       const response = await admin.messaging().sendEachForMulticast(message);
@@ -125,10 +133,10 @@ export class PushNotificationService {
     try {
       const message: admin.messaging.Message = {
         topic,
-        notification: {
-          title: payload.title,
-          body: payload.body,
-        },
+        // notification: {
+        //   title: payload.title,
+        //   body: payload.body,
+        // },
         data: payload.data,
       };
 
