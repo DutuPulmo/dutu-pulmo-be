@@ -103,9 +103,7 @@ export class DoctorScheduleFeeService {
       finalFee = originalBaseFee;
     }
 
-    const minimumBookingDays = Math.ceil(
-      schedule.minimumBookingTime / (24 * 60),
-    );
+    const minimumBookingDays = (schedule.minimumBookingTime ?? 0) / (24 * 60);
 
     return {
       ...schedule,
@@ -155,9 +153,7 @@ export class DoctorScheduleFeeService {
         finalFee = baseFee;
       }
 
-      const minimumBookingDays = Math.ceil(
-        schedule.minimumBookingTime / (24 * 60),
-      );
+      const minimumBookingDays = (schedule.minimumBookingTime ?? 0) / (24 * 60);
 
       return {
         ...schedule,

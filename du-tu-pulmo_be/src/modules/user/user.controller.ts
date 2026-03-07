@@ -31,6 +31,7 @@ import {
   PaginatedUserResponseDto,
 } from '@/modules/user/dto/user-response.dto';
 import { UserQueryDto } from '@/modules/user/dto/user-query.dto';
+import { FcmTokenDto } from '@/modules/user/dto/fcm-token.dto';
 import { JwtAuthGuard } from '@/modules/core/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/modules/core/auth/guards/roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
@@ -215,5 +216,27 @@ export class UserController {
   @ApiResponse({ status: HttpStatus.OK, description: 'Xóa user thành công' })
   remove(@Param('id') id: string) {
     return this.userService.remove(id);
+  }
+
+  @Post('me/fcm-token')
+  @ApiOperation({ summary: 'Thêm FCM Token cho user hiện tại' })
+  @ApiBody({ type: FcmTokenDto })
+  @ApiResponse({ status: 200, description: 'Lưu token thành công' })
+  async addFcmToken(
+    @Body() fcmTokenDto: FcmTokenDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.userService.addFcmToken(user.userId, fcmTokenDto.token);
+  }
+
+  @Delete('me/fcm-token')
+  @ApiOperation({ summary: 'Xóa FCM Token cho user hiện tại (khi logout)' })
+  @ApiBody({ type: FcmTokenDto })
+  @ApiResponse({ status: 200, description: 'Xóa token thành công' })
+  async removeFcmToken(
+    @Body() fcmTokenDto: FcmTokenDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.userService.removeFcmToken(user.userId, fcmTokenDto.token);
   }
 }

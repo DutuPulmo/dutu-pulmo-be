@@ -174,4 +174,37 @@ export class UserService {
       upload: uploaded,
     };
   }
+
+  async addFcmToken(userId: string, token: string): Promise<ResponseCommon> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    if (!user.fcmTokens) {
+      user.fcmTokens = [];
+    }
+
+    // Only add if not already in the array
+    if (!user.fcmTokens.includes(token)) {
+      user.fcmTokens.push(token);
+      await this.userRepository.save(user);
+    }
+
+    return new ResponseCommon(200, 'SUCCESS', { message: 'FCM Token added successfully' });
+  }
+
+  async removeFcmToken(userId: string, token: string): Promise<ResponseCommon> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    if (user.fcmTokens && user.fcmTokens.includes(token)) {
+      user.fcmTokens = user.fcmTokens.filter(t => t !== token);
+      await this.userRepository.save(user);
+    }
+
+    return new ResponseCommon(200, 'SUCCESS', { message: 'FCM Token removed successfully' });
+  }
 }

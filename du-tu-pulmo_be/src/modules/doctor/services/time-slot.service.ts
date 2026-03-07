@@ -7,7 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, DataSource, MoreThanOrEqual, In } from 'typeorm';
+import { Repository, Between, DataSource, MoreThanOrEqual, In, SelectQueryBuilder } from 'typeorm';
 import { TimeSlot } from '@/modules/doctor/entities/time-slot.entity';
 import {
   CreateTimeSlotDto,
@@ -16,6 +16,7 @@ import {
 import { ResponseCommon } from '@/common/dto/response.dto';
 import { DoctorSchedule } from '@/modules/doctor/entities/doctor-schedule.entity';
 import { AppointmentTypeEnum } from 'src/modules/common/enums/appointment-type.enum';
+import { vnNow, startOfDayVN, endOfDayVN } from '@/common/datetime';
 
 const MAX_SLOTS_PER_REQUEST = 100;
 const MAX_SLOTS_PER_DAY = 50;
@@ -61,15 +62,47 @@ export class TimeSlotService {
   }
 
   async findByDoctorId(doctorId: string): Promise<ResponseCommon<TimeSlot[]>> {
-    const now = new Date();
+    const now = vnNow();
     const slots = await this.timeSlotRepository.find({
       where: {
         doctorId,
         startTime: MoreThanOrEqual(now),
+        isAvailable: true,
       },
       order: { startTime: 'ASC' },
     });
-    return new ResponseCommon(200, 'SUCCESS', slots);
+    return new ResponseCommon(
+      200,
+      'SUCCESS',
+      slots.filter((s) => s.bookedCount < s.capacity),
+    );
+  }
+  
+  
+  private buildAvailableSlotQuery(
+    doctorId: string,
+    effectiveStart: Date,
+    effectiveEnd: Date,
+    now: Date,
+  ): SelectQueryBuilder<TimeSlot> {
+    return this.timeSlotRepository
+      .createQueryBuilder('slot')
+      .leftJoin('slot.schedule', 'schedule')
+      .where('slot.doctorId = :doctorId', { doctorId })
+      .andWhere('slot.startTime BETWEEN :effectiveStart AND :effectiveEnd', {
+        effectiveStart,
+        effectiveEnd,
+      })
+      .andWhere('slot.isAvailable = true')
+      .andWhere('slot.bookedCount < slot.capacity')
+      .andWhere(
+        `slot.startTime >= :now::timestamptz + COALESCE(schedule.minimumBookingTime, 0) * interval '1 minute'`,
+        { now },
+      )
+      .andWhere(
+        `slot.startTime <= :now::timestamptz + COALESCE(schedule.maxAdvanceBookingDays, 30) * interval '1 day'`,
+        { now },
+      );
   }
 
   async findAvailableSlots(
@@ -77,19 +110,12 @@ export class TimeSlotService {
     startDate: Date,
     endDate: Date,
   ): Promise<TimeSlot[]> {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
+    const now = vnNow();
     const effectiveStart = startDate > now ? startDate : now;
-    const slots = await this.timeSlotRepository.find({
-      where: {
-        doctorId,
-        isAvailable: true,
-        startTime: Between(effectiveStart, endDate),
-      },
-      order: { startTime: 'ASC' },
-    });
 
-    return slots.filter((slot) => slot.bookedCount < slot.capacity);
+    return this.buildAvailableSlotQuery(doctorId, effectiveStart, endDate, now)
+      .orderBy('slot.startTime', 'ASC')
+      .getMany();
   }
 
   async findSlotsInRange(
@@ -115,21 +141,18 @@ export class TimeSlotService {
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
     }
 
-    const now = new Date();
-    const queryDate = new Date(date);
-    queryDate.setHours(0, 0, 0, 0);
+    const now = vnNow();
+    const todayStart = startOfDayVN(now);
+    const queryDate = startOfDayVN(date);
 
-    if (queryDate < new Date(now.setHours(0, 0, 0, 0))) {
+    if (queryDate < todayStart) {
       return new ResponseCommon(200, 'Ngày đã qua', []);
     }
 
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
+    const dayStart = startOfDayVN(date);
+    const dayEnd = endOfDayVN(date);
 
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const slots = await this.findAvailableSlots(doctorId, startOfDay, endOfDay);
+    const slots = await this.findAvailableSlots(doctorId, dayStart, dayEnd);
     return new ResponseCommon(200, 'SUCCESS', slots);
   }
 
@@ -162,15 +185,17 @@ export class TimeSlotService {
   ): void {
     const startTime = new Date(dto.startTime);
     const endTime = new Date(dto.endTime);
-    const now = new Date();
+    const now = vnNow();
 
     if (startTime >= endTime) {
       this.logger.error('Invalid time range');
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
     }
 
-    const minBookingHours = doctorSchedule?.minimumBookingTime || 1;
-    const minBookingBufferMs = minBookingHours * 60 * 60 * 1000;
+    // minimumBookingTime is stored in MINUTES in the DB
+    // Behavior Note: Using ?? 0 means if no minimumBookingTime is set, slots can be booked immediately.
+    const minBookingMinutes = doctorSchedule?.minimumBookingTime ?? 0;
+    const minBookingBufferMs = minBookingMinutes * 60 * 1000;
     const earliestAllowed = new Date(now.getTime() + minBookingBufferMs);
 
     if (startTime < earliestAllowed) {
@@ -178,7 +203,7 @@ export class TimeSlotService {
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
     }
 
-    const maxAdvanceDays = doctorSchedule?.maxAdvanceBookingDays || 90;
+    const maxAdvanceDays = doctorSchedule?.maxAdvanceBookingDays ?? 30;
     const maxDate = new Date(
       now.getTime() + maxAdvanceDays * 24 * 60 * 60 * 1000,
     );
@@ -635,32 +660,52 @@ export class TimeSlotService {
     fromDate: Date,
     toDate: Date,
   ): Promise<ResponseCommon<any[]>> {
-    const startOfDay = new Date(fromDate);
-    startOfDay.setHours(0, 0, 0, 0);
+    const now = vnNow();
+    const todayStart = startOfDayVN(now);
+    const fromDateStart = startOfDayVN(fromDate);
 
-    const endOfDay = new Date(toDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    const effectiveStart =
+      fromDateStart.getTime() === todayStart.getTime() ? now : fromDateStart;
+    const effectiveEnd = endOfDayVN(toDate);
 
-    const result = await this.timeSlotRepository
-      .createQueryBuilder('slot')
-      .select("TO_CHAR(slot.startTime, 'YYYY-MM-DD')", 'date')
+
+    const result = await this.buildAvailableSlotQuery(
+      doctorId,
+      effectiveStart,
+      effectiveEnd,
+      now,
+    )
+      .select(
+        "TO_CHAR(slot.startTime AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD')",
+        'date',
+      )
       .addSelect('COUNT(slot.id)', 'count')
-      .where('slot.doctorId = :doctorId', { doctorId })
-      .andWhere('slot.startTime BETWEEN :start AND :end', {
-        start: startOfDay,
-        end: endOfDay,
-      })
-      .andWhere('slot.isAvailable = :isAvailable', { isAvailable: true })
-      .andWhere('slot.bookedCount < slot.capacity')
-      .groupBy("TO_CHAR(slot.startTime, 'YYYY-MM-DD')")
-      .orderBy("TO_CHAR(slot.startTime, 'YYYY-MM-DD')", 'ASC')
+      .groupBy(
+        "TO_CHAR(slot.startTime AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD')",
+      )
+      .orderBy(
+        "TO_CHAR(slot.startTime AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD')",
+        'ASC',
+      )
       .getRawMany<AvailabilitySummaryRaw>();
 
-    const summary = result.map((item) => ({
-      date: item.date,
-      count: parseInt(item.count, 10),
-      hasAvailability: parseInt(item.count, 10) > 0,
-    }));
+    const resultMap = new Map<string, number>();
+    for (const item of result) {
+      resultMap.set(item.date, parseInt(item.count, 10));
+    }
+
+    const summary: Array<{ date: string; count: number; hasAvailability: boolean }> = [];
+    const cursor = startOfDayVN(fromDate);
+    const rangeEnd = startOfDayVN(toDate);
+
+    while (cursor <= rangeEnd) {
+      const dateKey = cursor
+        .toLocaleString('sv', { timeZone: 'Asia/Ho_Chi_Minh' })
+        .split(' ')[0];
+      const count = resultMap.get(dateKey) ?? 0;
+      summary.push({ date: dateKey, count, hasAvailability: count > 0 });
+      cursor.setDate(cursor.getDate() + 1);
+    }
 
     return new ResponseCommon(200, 'SUCCESS', summary);
   }

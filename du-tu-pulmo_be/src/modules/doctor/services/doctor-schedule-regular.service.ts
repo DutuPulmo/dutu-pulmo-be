@@ -31,7 +31,7 @@ import {
 import { NotificationService } from '@/modules/notification/notification.service';
 import { DoctorScheduleHelperService } from '@/modules/doctor/services/doctor-schedule-helper.service';
 import { DoctorScheduleSlotService } from '@/modules/doctor/services/doctor-schedule-slot.service';
-import { addDaysVN, endOfDayVN, startOfDayVN, vnNow } from '@/common/datetime';
+import { addDaysVN, endOfDayVN, startOfDayVN, vnNow, getDayVN } from '@/common/datetime';
 
 @Injectable()
 export class DoctorScheduleRegularService {
@@ -280,9 +280,7 @@ export class DoctorScheduleRegularService {
             effectiveUntil: dto.effectiveUntil
               ? new Date(dto.effectiveUntil)
               : null,
-            minimumBookingTime: dto.minimumBookingDays
-              ? dto.minimumBookingDays * 24 * 60
-              : 0,
+            minimumBookingTime: (dto.minimumBookingDays ?? 0) * 24 * 60,
             maxAdvanceBookingDays: dto.maxAdvanceBookingDays ?? 30,
           }),
         );
@@ -343,6 +341,7 @@ export class DoctorScheduleRegularService {
     id: string,
     dto: UpdateDoctorScheduleDto,
   ): Promise<ResponseCommon<DoctorSchedule>> {
+    console.log('updateRegular', id, dto.minimumBookingDays);
     const existing = await this.scheduleRepository.findOne({ where: { id } });
     if (!existing) {
       this.logger.error('Schedule not found');
@@ -421,6 +420,10 @@ export class DoctorScheduleRegularService {
       scheduleType: undefined,
       priority,
       isAvailable: newIsAvailable,
+      minimumBookingTime:
+        dto.minimumBookingDays !== undefined
+          ? dto.minimumBookingDays * 24 * 60
+          : 0,
       consultationFee:
         dto.consultationFee !== undefined
           ? (dto.consultationFee?.toString() ?? null)
@@ -438,6 +441,10 @@ export class DoctorScheduleRegularService {
             : null
           : undefined,
     };
+
+    if ('minimumBookingDays' in updateData) {
+      delete (updateData as any).minimumBookingDays;
+    }
 
     Object.keys(updateData).forEach((key) => {
       if (updateData[key as keyof typeof updateData] === undefined) {
@@ -558,6 +565,9 @@ export class DoctorScheduleRegularService {
             slotCapacity: updateData.slotCapacity,
             appointmentType: updateData.appointmentType,
             consultationFee: updateData.consultationFee,
+            discountPercent: updateData.discountPercent,
+            minimumBookingDays: updateData.minimumBookingDays,
+            maxAdvanceBookingDays: updateData.maxAdvanceBookingDays,
             isAvailable: updateData.isAvailable,
             effectiveFrom: updateData.effectiveFrom,
             effectiveUntil: updateData.effectiveUntil,
@@ -587,6 +597,12 @@ export class DoctorScheduleRegularService {
               updateData.consultationFee !== undefined
                 ? (updateData.consultationFee?.toString() ?? null)
                 : undefined,
+            discountPercent: updateData.discountPercent,
+            minimumBookingTime:
+              updateData.minimumBookingDays !== undefined
+                ? updateData.minimumBookingDays * 24 * 60
+                : undefined,
+            maxAdvanceBookingDays: updateData.maxAdvanceBookingDays,
             isAvailable: updateData.isAvailable,
             effectiveFrom:
               updateData.effectiveFrom !== undefined
@@ -685,9 +701,9 @@ export class DoctorScheduleRegularService {
             // );
             // const checkDayOfWeek = checkDateVN.getUTCDay();
             const matchesOldDay =
-              (checkDate.getUTCDay() + 1) % 7 === existing.dayOfWeek;
+              getDayVN(checkDate) === existing.dayOfWeek;
             const matchesNewDay =
-              (checkDate.getUTCDay() + 1) % 7 === newDayOfWeek;
+              getDayVN(checkDate) === newDayOfWeek;
 
             if (!matchesOldDay && !matchesNewDay) {
               checkDate.setDate(checkDate.getDate() + 1);
@@ -730,6 +746,8 @@ export class DoctorScheduleRegularService {
                   .split(':')
                   .map(Number);
                 const [newEndH, newEndM] = newEndTime.split(':').map(Number);
+
+                if (!apt.timeSlot?.schedule?.slotDuration) continue;
 
                 const newScheduleStart = new Date(
                   checkDate.getTime() + (newStartH * 60 + newStartM) * 60000,
@@ -816,6 +834,12 @@ export class DoctorScheduleRegularService {
             dto.consultationFee !== undefined
               ? (dto.consultationFee?.toString() ?? null)
               : undefined,
+          discountPercent: dto.discountPercent,
+          minimumBookingTime:
+            dto.minimumBookingDays !== undefined
+              ? dto.minimumBookingDays * 24 * 60
+              : undefined,
+          maxAdvanceBookingDays: dto.maxAdvanceBookingDays,
           isAvailable: dto.isAvailable,
           effectiveFrom:
             dto.effectiveFrom !== undefined
@@ -841,11 +865,9 @@ export class DoctorScheduleRegularService {
         const regularPriority = SCHEDULE_TYPE_PRIORITY[ScheduleType.REGULAR];
 
         while (slotGenDate <= actualRangeEnd) {
-          if (slotGenDate.getDay() === newDayOfWeek) {
-            const dayStart = new Date(slotGenDate);
-            dayStart.setHours(0, 0, 0, 0);
-            const dayEnd = new Date(slotGenDate);
-            dayEnd.setHours(23, 59, 59, 999);
+          if (getDayVN(slotGenDate) === newDayOfWeek) {
+            const dayStart = startOfDayVN(slotGenDate);
+            const dayEnd = endOfDayVN(slotGenDate);
 
             const higherPrioritySchedules = await manager.find(DoctorSchedule, {
               where: {
@@ -864,11 +886,15 @@ export class DoctorScheduleRegularService {
             const [startH, startM] = newStartTime.split(':').map(Number);
             const [endH, endM] = newEndTime.split(':').map(Number);
 
-            const scheduleStart = new Date(slotGenDate);
-            scheduleStart.setHours(startH, startM, 0, 0);
+            const baseDate = startOfDayVN(slotGenDate);
 
-            const scheduleEnd = new Date(slotGenDate);
-            scheduleEnd.setHours(endH, endM, 0, 0);
+            const scheduleStart = new Date(
+              baseDate.getTime() + (startH * 60 + startM) * 60000,
+            );
+
+            const scheduleEnd = new Date(
+              baseDate.getTime() + (endH * 60 + endM) * 60000,
+            );
 
             const existingSlots = await manager.find(TimeSlot, {
               where: {
@@ -974,8 +1000,7 @@ export class DoctorScheduleRegularService {
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
     }
 
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
+    const now = startOfDayVN(vnNow());
 
     const result = await this.dataSource.transaction(
       async (manager: EntityManager) => {
@@ -1011,7 +1036,9 @@ export class DoctorScheduleRegularService {
           .createQueryBuilder(DoctorSchedule, 'ds')
           .select('ds.specificDate')
           .where('ds.doctorId = :doctorId', { doctorId: schedule.doctorId })
-          .andWhere('ds.scheduleType = :type', { type: ScheduleType.FLEXIBLE })
+          .andWhere('ds.scheduleType IN (:...types)', {
+            types: [ScheduleType.FLEXIBLE, ScheduleType.TIME_OFF],
+          })
           .andWhere('ds.specificDate >= :now', { now })
           .getMany();
 

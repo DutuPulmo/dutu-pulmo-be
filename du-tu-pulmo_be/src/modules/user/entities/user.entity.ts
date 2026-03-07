@@ -70,6 +70,9 @@ export class User {
   @Column({ nullable: true, unique: true, length: 20 })
   CCCD?: string;
 
+  @Column({ type: 'text', array: true, nullable: true, default: [] })
+  fcmTokens: string[];
+
   @Column({
     type: 'enum',
     enum: GenderEnum,

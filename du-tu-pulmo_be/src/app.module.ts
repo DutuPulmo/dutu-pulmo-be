@@ -44,6 +44,8 @@ import payosConfig from '@/config/payos.config';
 // Middleware
 import * as Joi from 'joi';
 import { LoggerMiddleware } from '@/common/middleware/logger.middleware';
+import { PushNotificationModule } from '@/modules/push-notification/push-notification.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -76,6 +78,11 @@ import { LoggerMiddleware } from '@/common/middleware/logger.middleware';
         PAYOS_CLIENT_ID: Joi.string().required(),
         PAYOS_API_KEY: Joi.string().required(),
         PAYOS_CHECKSUM_KEY: Joi.string().required(),
+
+        // Firebase configuration
+        FIREBASE_PROJECT_ID: Joi.string().required(),
+        FIREBASE_CLIENT_EMAIL: Joi.string().required(),
+        FIREBASE_PRIVATE_KEY: Joi.string().required(),
       }),
     }),
     ThrottlerModule.forRoot([
@@ -111,6 +118,8 @@ import { LoggerMiddleware } from '@/common/middleware/logger.middleware';
     ScreeningModule,
     UserModule,
     VideoCallModule,
+    PushNotificationModule,
+    EventEmitterModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [

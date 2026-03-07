@@ -392,13 +392,13 @@ export class SlotGeneratorService {
 
   getEarliestValidBookingTime(schedule: DoctorSchedule): Date {
     const now = vnNow();
-    const minBookingMs = (schedule.minimumBookingTime || 60) * 60 * 1000;
+    const minBookingMs = (schedule.minimumBookingTime ?? 0) * 60 * 1000;
     return new Date(now.getTime() + minBookingMs);
   }
 
   getLatestValidBookingDate(schedule: DoctorSchedule): Date {
     const today = startOfDayVN(vnNow());
-    const maxDays = schedule.maxAdvanceBookingDays || 30;
+    const maxDays = schedule.maxAdvanceBookingDays ?? 30;
     return new Date(today.getTime() + maxDays * 24 * 60 * 60 * 1000);
   }
 
