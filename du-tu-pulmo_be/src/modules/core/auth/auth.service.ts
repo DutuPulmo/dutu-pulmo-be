@@ -96,7 +96,7 @@ export class AuthService {
         .createQueryBuilder('a')
         .leftJoinAndSelect('a.user', 'u')
         .where('a.email = :email', { email: normalizedEmail })
-        .setLock('pessimistic_write')
+        .setLock('pessimistic_write', undefined, ['a'])
         .getOne();
 
       if (existingAccount && existingAccount.isVerified) {
