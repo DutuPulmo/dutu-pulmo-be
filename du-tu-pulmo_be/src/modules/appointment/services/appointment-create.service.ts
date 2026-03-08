@@ -20,6 +20,7 @@ import { DailyService } from '@/modules/video_call/daily.service';
 import { AppointmentMapperService } from '@/modules/appointment/services/appointment-mapper.service';
 import { diffMinutes, isBeforeVN, vnNow } from '@/common/datetime';
 import { ERROR_MESSAGES } from '@/common/constants/error-messages.constant';
+import { ConsultationPricingService } from '@/modules/doctor/services/consultation-pricing.service';
 
 @Injectable()
 export class AppointmentCreateService {
@@ -29,13 +30,8 @@ export class AppointmentCreateService {
     private readonly dataSource: DataSource,
     private readonly dailyService: DailyService,
     private readonly mapper: AppointmentMapperService,
+    private readonly pricingService: ConsultationPricingService,
   ) {}
-
-  private getFee(value: string | number | null | undefined): number {
-    if (value === null || value === undefined) return 0;
-    const num = Number(value);
-    return Number.isNaN(num) ? 0 : num;
-  }
 
   private generateAppointmentNumber(): string {
     const timestamp = Date.now().toString(36).toUpperCase();
@@ -124,20 +120,15 @@ export class AppointmentCreateService {
         hospitalId = doctor?.primaryHospitalId || undefined;
       }
 
-      let baseFee = this.getFee(schedule?.consultationFee);
-      if (baseFee === 0) {
-        baseFee = this.getFee(doctor?.defaultConsultationFee);
-      }
-
-      const discountPercent = schedule?.discountPercent || 0;
-      let finalFee = baseFee;
-
-      if (discountPercent > 0 && baseFee > 0) {
-        finalFee = baseFee * ((100 - discountPercent) / 100);
-      }
-
-      finalFee = Math.floor(finalFee);
-      const feeAmount = String(finalFee);
+      const baseFee = this.pricingService.resolveBaseFee(
+        schedule?.consultationFee,
+        doctor?.defaultConsultationFee,
+      );
+      const { finalFee } = this.pricingService.calculateFinalFee(
+        baseFee,
+        schedule?.discountPercent,
+      );
+      const feeAmount = this.pricingService.toVndString(finalFee);
       const isFree = finalFee === 0;
 
       const scheduledAt = slot.startTime;

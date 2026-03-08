@@ -24,10 +24,14 @@ import { MedicalModule } from '@/modules/medical/medical.module';
 import { Doctor } from '@/modules/doctor/entities/doctor.entity';
 import { Patient } from '@/modules/patient/entities/patient.entity';
 import { Payment } from '@/modules/payment/entities/payment.entity';
+import { DoctorModule } from '@/modules/doctor/doctor.module';
+import { PaymentModule } from '@/modules/payment/payment.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Appointment, TimeSlot, Doctor, Patient, Payment]),
+    DoctorModule,
+    PaymentModule,
     forwardRef(() => VideoCallModule),
     forwardRef(() => MedicalModule),
   ],
