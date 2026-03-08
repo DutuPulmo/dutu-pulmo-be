@@ -3,36 +3,22 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DoctorSchedule } from '@/modules/doctor/entities/doctor-schedule.entity';
 import { Doctor } from '@/modules/doctor/entities/doctor.entity';
+import { ConsultationPricingService } from '@/modules/doctor/services/consultation-pricing.service';
 
 @Injectable()
 export class DoctorScheduleFeeService {
   constructor(
     @InjectRepository(Doctor)
     private readonly doctorRepository: Repository<Doctor>,
+    private readonly pricingService: ConsultationPricingService,
   ) {}
 
   async getEffectiveConsultationFee(
     schedule: DoctorSchedule,
   ): Promise<string | null> {
-    let baseFee: string | null = null;
-
-    if (schedule.consultationFee) {
-      baseFee = schedule.consultationFee;
-    } else {
-      const doctor = await this.doctorRepository.findOne({
-        where: { id: schedule.doctorId },
-        select: ['id', 'defaultConsultationFee'],
-      });
-      baseFee = doctor?.defaultConsultationFee ?? null;
-    }
-
-    if (baseFee && schedule.discountPercent && schedule.discountPercent > 0) {
-      const baseFeeNum = parseFloat(baseFee);
-      const discountedFee = baseFeeNum * (1 - schedule.discountPercent / 100);
-      return discountedFee.toFixed(2);
-    }
-
-    return baseFee;
+    const { baseFee, finalFee } = await this.resolvePricing(schedule);
+    if (baseFee === 0 && finalFee === 0) return null;
+    return this.pricingService.toVndString(finalFee);
   }
 
   async getConsultationFeeDetails(schedule: DoctorSchedule): Promise<{
@@ -40,31 +26,13 @@ export class DoctorScheduleFeeService {
     discountPercent: number;
     finalFee: string | null;
   }> {
-    let baseFee: string | null = null;
-
-    if (schedule.consultationFee) {
-      baseFee = schedule.consultationFee;
-    } else {
-      const doctor = await this.doctorRepository.findOne({
-        where: { id: schedule.doctorId },
-        select: ['id', 'defaultConsultationFee'],
-      });
-      baseFee = doctor?.defaultConsultationFee ?? null;
-    }
-
-    const discountPercent = schedule.discountPercent ?? 0;
-    let finalFee = baseFee;
-
-    if (baseFee && discountPercent > 0) {
-      const baseFeeNum = parseFloat(baseFee);
-      const discountedFee = baseFeeNum * (1 - discountPercent / 100);
-      finalFee = discountedFee.toFixed(2);
-    }
+    const { baseFee, discountPercent, finalFee } =
+      await this.resolvePricing(schedule);
 
     return {
-      baseFee,
+      baseFee: baseFee > 0 ? this.pricingService.toVndString(baseFee) : null,
       discountPercent,
-      finalFee,
+      finalFee: finalFee > 0 ? this.pricingService.toVndString(finalFee) : null,
     };
   }
 
@@ -76,38 +44,25 @@ export class DoctorScheduleFeeService {
       minimumBookingDays: number;
     }
   > {
-    const baseFee = await this.getEffectiveConsultationFee(schedule);
+    const pricing = await this.resolvePricing(schedule);
 
     let finalFee: string | null = null;
     let savedAmount: string | null = null;
-
-    let originalBaseFee: string | null = null;
-    if (schedule.consultationFee) {
-      originalBaseFee = schedule.consultationFee;
-    } else {
-      const doctor = await this.doctorRepository.findOne({
-        where: { id: schedule.doctorId },
-        select: ['id', 'defaultConsultationFee'],
-      });
-      originalBaseFee = doctor?.defaultConsultationFee ?? null;
-    }
-
-    const discountPercent = schedule.discountPercent ?? 0;
-
-    if (originalBaseFee && discountPercent > 0) {
-      const baseAmount = parseFloat(originalBaseFee);
-      const discount = baseAmount * (discountPercent / 100);
-      finalFee = (baseAmount - discount).toFixed(0);
-      savedAmount = discount.toFixed(0);
-    } else {
-      finalFee = originalBaseFee;
+    if (pricing.baseFee > 0) {
+      finalFee = this.pricingService.toVndString(pricing.finalFee);
+      savedAmount = this.pricingService.toVndString(
+        pricing.baseFee - pricing.finalFee,
+      );
     }
 
     const minimumBookingDays = (schedule.minimumBookingTime ?? 0) / (24 * 60);
 
     return {
       ...schedule,
-      effectiveConsultationFee: baseFee,
+      effectiveConsultationFee:
+        pricing.baseFee > 0
+          ? this.pricingService.toVndString(pricing.baseFee)
+          : null,
       finalFee,
       savedAmount,
       minimumBookingDays,
@@ -137,31 +92,53 @@ export class DoctorScheduleFeeService {
     );
 
     return schedules.map((schedule) => {
-      const baseFee =
-        schedule.consultationFee ?? doctorFeeMap.get(schedule.doctorId) ?? null;
-      const discountPercent = schedule.discountPercent ?? 0;
-
-      let finalFee: string | null = null;
-      let savedAmount: string | null = null;
-
-      if (baseFee && discountPercent > 0) {
-        const baseAmount = parseFloat(baseFee);
-        const discount = baseAmount * (discountPercent / 100);
-        finalFee = (baseAmount - discount).toFixed(0);
-        savedAmount = discount.toFixed(0);
-      } else {
-        finalFee = baseFee;
-      }
+      const baseFee = this.pricingService.resolveBaseFee(
+        schedule.consultationFee,
+        doctorFeeMap.get(schedule.doctorId),
+      );
+      const pricing = this.pricingService.calculateFinalFee(
+        baseFee,
+        schedule.discountPercent,
+      );
+      const finalFee = pricing.finalFee > 0
+        ? this.pricingService.toVndString(pricing.finalFee)
+        : null;
+      const savedAmount =
+        pricing.baseFee > 0
+          ? this.pricingService.toVndString(pricing.baseFee - pricing.finalFee)
+          : null;
 
       const minimumBookingDays = (schedule.minimumBookingTime ?? 0) / (24 * 60);
 
       return {
         ...schedule,
-        effectiveConsultationFee: baseFee,
+        effectiveConsultationFee:
+          pricing.baseFee > 0
+            ? this.pricingService.toVndString(pricing.baseFee)
+            : null,
         finalFee,
         savedAmount,
         minimumBookingDays,
       };
     });
+  }
+
+  private async resolvePricing(
+    schedule: DoctorSchedule,
+  ): Promise<{ baseFee: number; discountPercent: number; finalFee: number }> {
+    let doctorDefaultFee: string | null = null;
+    if (!schedule.consultationFee) {
+      const doctor = await this.doctorRepository.findOne({
+        where: { id: schedule.doctorId },
+        select: ['id', 'defaultConsultationFee'],
+      });
+      doctorDefaultFee = doctor?.defaultConsultationFee ?? null;
+    }
+
+    const baseFee = this.pricingService.resolveBaseFee(
+      schedule.consultationFee,
+      doctorDefaultFee,
+    );
+    return this.pricingService.calculateFinalFee(baseFee, schedule.discountPercent);
   }
 }
