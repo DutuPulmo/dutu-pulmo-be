@@ -269,7 +269,7 @@ export class AuthController {
   async logout(
     @CurrentUser() user: jwtStrategy.JwtUser,
   ): Promise<ResponseCommon<AuthMessageResponseDto>> {
-    const response = await this.authService.logout(user.id);
+    const response = await this.authService.logout(user.userId);
     return new ResponseCommon(response.code, response.message, {
       message: response.data?.message ?? '',
     });
