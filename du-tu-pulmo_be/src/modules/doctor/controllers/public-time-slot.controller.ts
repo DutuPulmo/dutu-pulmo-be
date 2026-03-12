@@ -18,6 +18,7 @@ import {
 import { TimeSlotService } from '@/modules/doctor/services/time-slot.service';
 import { TimeSlotResponseDto } from '@/modules/doctor/dto/schedule-response.dto';
 import { ResponseCommon } from '@/common/dto/response.dto';
+import { AppointmentTypeFilterEnum } from '@/modules/doctor/dto/appointment-type-filter.enum';
 
 @ApiTags('Public Time Slots')
 @Controller('public/doctors/:doctorId/time-slots')
@@ -50,6 +51,12 @@ export class PublicTimeSlotController {
     description: 'Ngày cần tìm (YYYY-MM-DD)',
     required: true,
   })
+  @ApiQuery({
+    name: 'appointmentType',
+    required: false,
+    enum: AppointmentTypeFilterEnum,
+    description: 'Lọc slot theo online/offline (mặc định all)',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Danh sách time slots còn trống',
@@ -58,6 +65,7 @@ export class PublicTimeSlotController {
   async findAvailable(
     @Param('doctorId', ParseUUIDPipe) doctorId: string,
     @Query('date') dateStr: string,
+    @Query('appointmentType') appointmentType?: AppointmentTypeFilterEnum,
   ): Promise<ResponseCommon<TimeSlotResponseDto[]>> {
     if (!dateStr) {
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
@@ -66,9 +74,17 @@ export class PublicTimeSlotController {
     if (isNaN(date.getTime())) {
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
     }
+
+    const typeFilter =
+      appointmentType &&
+      Object.values(AppointmentTypeFilterEnum).includes(appointmentType)
+        ? appointmentType
+        : AppointmentTypeFilterEnum.ALL;
+
     const result = await this.timeSlotService.findAvailableSlotsByDate(
       doctorId,
       date,
+      typeFilter,
     );
     const data = (result.data ?? []).map((slot) =>
       TimeSlotResponseDto.fromEntity(slot),
@@ -92,6 +108,12 @@ export class PublicTimeSlotController {
     description: 'Ngày kết thúc (YYYY-MM-DD)',
     required: false,
   })
+  @ApiQuery({
+    name: 'appointmentType',
+    required: false,
+    enum: AppointmentTypeFilterEnum,
+    description: 'Lọc summary theo online/offline (mặc định all)',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Danh sách tóm tắt',
@@ -100,6 +122,7 @@ export class PublicTimeSlotController {
     @Param('doctorId', ParseUUIDPipe) doctorId: string,
     @Query('from') fromStr?: string,
     @Query('to') toStr?: string,
+    @Query('appointmentType') appointmentType?: AppointmentTypeFilterEnum,
   ) {
     let fromDate: Date;
     let toDate: Date;
@@ -121,10 +144,17 @@ export class PublicTimeSlotController {
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
     }
 
+    const typeFilter =
+      appointmentType &&
+      Object.values(AppointmentTypeFilterEnum).includes(appointmentType)
+        ? appointmentType
+        : AppointmentTypeFilterEnum.ALL;
+
     return this.timeSlotService.getAvailabilitySummary(
       doctorId,
       fromDate,
       toDate,
+      typeFilter,
     );
   }
 
