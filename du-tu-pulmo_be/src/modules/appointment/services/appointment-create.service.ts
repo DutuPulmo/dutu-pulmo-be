@@ -105,17 +105,29 @@ export class AppointmentCreateService {
         throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
       }
 
-      const existingAppointment = await manager.findOne(Appointment, {
-        where: {
-          patientId: data.patientId,
-          timeSlotId: data.timeSlotId,
-          status: Not(In([AppointmentStatusEnum.CANCELLED])),
-        },
-        lock: { mode: 'pessimistic_read' },
-      });
+      const existingAppointment = await manager
+        .createQueryBuilder(Appointment, 'apt')
+        .setLock('pessimistic_read')
+        .innerJoin('apt.timeSlot', 'existingSlot')
+        .where('apt.patientId = :patientId', { patientId: data.patientId })
+        .andWhere('apt.status NOT IN (:...statuses)', {
+          statuses: [AppointmentStatusEnum.CANCELLED],
+        })
+        .andWhere(
+          '(existingSlot.startTime < :newEndTime AND existingSlot.endTime > :newStartTime)',
+          {
+            newEndTime: slot.endTime,
+            newStartTime: slot.startTime,
+          },
+        )
+        .getOne();
+
+      console.log(existingAppointment);
 
       if (existingAppointment) {
-        this.logger.error('Existing appointment found');
+        this.logger.error(
+          'Patient has overlapping appointment conflicting with this time slot',
+        );
         throw new ConflictException(ERROR_MESSAGES.CONFLICT_DETECTED);
       }
 
