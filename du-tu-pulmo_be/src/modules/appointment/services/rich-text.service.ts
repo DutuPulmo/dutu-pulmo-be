@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import sanitizeHtml from 'sanitize-html';
 import { ERROR_MESSAGES } from '@/common/constants/error-messages.constant';
 import { CloudinaryService } from '@/modules/cloudinary';
 
@@ -54,51 +55,18 @@ export class RichTextService {
   }
 
   private sanitizeHtml(html: string): string {
-    const withoutBlockedTags = html
-      .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
-      .replace(/<iframe[\s\S]*?>[\s\S]*?<\/iframe>/gi, '')
-      .replace(/<object[\s\S]*?>[\s\S]*?<\/object>/gi, '')
-      .replace(/<embed[\s\S]*?>[\s\S]*?<\/embed>/gi, '');
-
-    return withoutBlockedTags.replace(
-      /<\/?([a-zA-Z0-9-]+)([^>]*?)\/?>/g,
-      (full, rawTagName: string, rawAttrs: string) => {
-        const isClosing = full.startsWith('</');
-        const tagName = rawTagName.toLowerCase();
-
-        if (!RichTextService.ALLOWED_TAGS.has(tagName)) {
-          return '';
-        }
-
-        if (isClosing) {
-          return tagName === 'img' ? '' : `</${tagName}>`;
-        }
-
-        if (tagName !== 'img') {
-          return `<${tagName}>`;
-        }
-
-        const attrs = this.parseAttributes(rawAttrs);
-        const filtered: ImgAttrMap = {};
-
-        for (const attrName of Object.keys(attrs)) {
-          if (!RichTextService.ALLOWED_IMG_ATTRS.has(attrName)) continue;
-          filtered[attrName] = attrs[attrName];
-        }
-
-        const src = filtered.src?.trim() ?? '';
-        if (
-          src &&
-          !/^data:image\/[a-zA-Z0-9.+-]+;base64,/i.test(src) &&
-          !/^https:\/\//i.test(src)
-        ) {
-          delete filtered.src;
-        }
-
-        return this.buildImgTag(filtered);
+    return sanitizeHtml(html, {
+      allowedTags: Array.from(RichTextService.ALLOWED_TAGS),
+      allowedAttributes: {
+        img: Array.from(RichTextService.ALLOWED_IMG_ATTRS),
       },
-    );
+      allowedSchemes: ['http', 'https', 'data'],
+      allowedSchemesByTag: {
+        img: ['http', 'https', 'data'],
+      },
+      allowProtocolRelative: false,
+      enforceHtmlBoundary: false,
+    });
   }
 
   private async uploadBase64Images(html: string): Promise<string> {

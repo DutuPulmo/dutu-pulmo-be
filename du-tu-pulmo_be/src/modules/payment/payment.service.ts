@@ -142,7 +142,6 @@ export class PaymentService {
       cancelUrl,
       expiredAt: Math.floor(Date.now() / 1000) + 15 * 60,
     });
-    console.log(paymentLink);
     // Create payment record with SECURITY: anonymized audit trail
     const { browserType, deviceType } = userAgent
       ? Payment.parseUserAgent(userAgent)
