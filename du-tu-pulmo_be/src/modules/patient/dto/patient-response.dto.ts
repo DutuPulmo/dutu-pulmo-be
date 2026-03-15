@@ -1,5 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginationMeta } from '@/common/dto/pagination.dto';
+import { CountryName } from '@/modules/common/enums/country.enum';
+import { EthnicityName } from '@/modules/common/enums/ethnicity.enum';
+import { OccupationName } from '@/modules/common/enums/job.enum';
 
 export class PatientUserSummaryDto {
   @ApiPropertyOptional()
@@ -164,9 +167,17 @@ export class PatientResponseDto {
         ward: patient.user.ward,
         address: patient.user.address,
         CCCD: patient.user.CCCD,
-        nationality: patient.user.nationality,
-        ethnicity: patient.user.ethnicity,
-        occupation: patient.user.occupation,
+        nationality: patient.user.nationality
+          ? CountryName[patient.user.nationality as keyof typeof CountryName]
+          : undefined,
+        ethnicity: patient.user.ethnicity
+          ? EthnicityName[patient.user.ethnicity as keyof typeof EthnicityName]
+          : undefined,
+        occupation: patient.user.occupation
+          ? OccupationName[
+              patient.user.occupation as keyof typeof OccupationName
+            ]
+          : undefined,
         email: patient.user.email || patient.user.account?.email,
       };
     }
