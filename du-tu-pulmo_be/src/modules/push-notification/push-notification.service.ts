@@ -137,7 +137,11 @@ export class PushNotificationService {
         //   title: payload.title,
         //   body: payload.body,
         // },
-        data: payload.data,
+        data: {
+          title: payload.title,
+          body: payload.body,
+          ...(payload.data || {})
+        } 
       };
 
       const response = await admin.messaging().send(message);
@@ -167,9 +171,13 @@ export class PushNotificationService {
         title: notification.title,
         body: notification.content,
         data: {
-          notificationId: notification.id,
-          type: notification.type,
-        },
+          title: notification.title,
+          body: notification.content,
+          id: String(notification.id),
+          userId: String(notification.userId),
+          type: String(notification.type),
+          refId: notification.refId ? String(notification.refId) : "",
+        } 
       };
 
       // Send multicast push

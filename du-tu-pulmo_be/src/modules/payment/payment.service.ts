@@ -16,6 +16,7 @@ import { Appointment } from '@/modules/appointment/entities/appointment.entity';
 import { AppointmentStatusEnum } from '@/modules/common/enums/appointment-status.enum';
 import { ERROR_MESSAGES } from '@/common/constants/error-messages.constant';
 import { PaymentPurpose } from '@/modules/common/enums/payment-purpose.enum';
+import { PaymentGateway } from '@/modules/payment/payment.gateway';
 
 export interface CreatePaymentDto {
   appointmentId: string;
@@ -32,6 +33,9 @@ export interface PaymentResponseDto {
   purpose: PaymentPurpose;
   checkoutUrl: string;
   qrCode: string;
+  bin?: string;
+  accountNumber?: string;
+  accountName?: string;
   appointmentId: string;
   paidAt?: Date;
   expiredAt?: Date;
@@ -48,6 +52,8 @@ export interface PaymentResponseDto {
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
+  private static readonly INVALIDATED_BY_RESCHEDULE =
+    'INVALIDATED_BY_RESCHEDULE';
 
   constructor(
     @InjectRepository(Payment)
@@ -57,6 +63,7 @@ export class PaymentService {
     private readonly payosService: PayosService,
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
+    private readonly paymentGateway: PaymentGateway,
   ) {}
 
   /**
@@ -107,10 +114,10 @@ export class PaymentService {
     const description = `Thanh toán lịch hẹn ${appointment.appointmentNumber}`;
 
     // Get URLs from config
-    const frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3001';
-    const returnUrl = dto.returnUrl || `${frontendUrl}/payment/success`;
-    const cancelUrl = dto.cancelUrl || `${frontendUrl}/payment/cancel`;
+    const backendUrl =
+      this.configService.get<string>('BACKEND_URL') || 'http://localhost:3000';
+    const returnUrl = dto.returnUrl || `${backendUrl}/payment/return`;
+    const cancelUrl = dto.cancelUrl || `${backendUrl}/payment/cancel-callback`;
 
     // Get buyer info
     const buyerName = appointment.patient?.user?.fullName;
@@ -121,7 +128,7 @@ export class PaymentService {
     const paymentLink = await this.payosService.createPaymentLink({
       orderCode,
       // amount: Number(appointment.feeAmount),
-      amount: 2001,
+      amount: 2000,
       description: description.substring(0, 25),
       buyerName,
       buyerEmail,
@@ -137,7 +144,6 @@ export class PaymentService {
       cancelUrl,
       expiredAt: Math.floor(Date.now() / 1000) + 15 * 60,
     });
-
     // Create payment record with SECURITY: anonymized audit trail
     const { browserType, deviceType } = userAgent
       ? Payment.parseUserAgent(userAgent)
@@ -275,6 +281,13 @@ export class PaymentService {
 
     this.logger.log(`Cancelled payment ${payment.id}`);
 
+    if (saved.appointmentId) {
+      this.paymentGateway.notifyPaymentStatus(
+        saved.appointmentId,
+        PaymentStatus.CANCELLED,
+      );
+    }
+
     return this.toDto(saved);
   }
 
@@ -304,6 +317,13 @@ export class PaymentService {
       return;
     }
 
+    if (this.isInvalidatedByReschedule(payment)) {
+      this.logger.warn(
+        `Ignored stale webhook for invalidated payment ${payment.id}`,
+      );
+      return;
+    }
+
     payment.webhookReceivedAt = new Date();
     payment.webhookMetadata = {
       code: webhookData.code,
@@ -324,6 +344,12 @@ export class PaymentService {
       // Update payment status based on webhook
       if (webhookData.success && webhookData.code === '00') {
         await this.handlePaymentSuccess(payment, webhookData);
+        if (payment.appointmentId) {
+          this.paymentGateway.notifyPaymentStatus(
+            payment.appointmentId,
+            PaymentStatus.PAID,
+          );
+        }
       } else {
         // Handle failed payment
         payment.status = PaymentStatus.FAILED;
@@ -331,7 +357,12 @@ export class PaymentService {
         payment.errorMessage = webhookData.desc;
         payment.lastErrorAt = new Date();
         await this.paymentRepository.save(payment);
-
+        if (payment.appointmentId) {
+          this.paymentGateway.notifyPaymentStatus(
+            payment.appointmentId,
+            PaymentStatus.FAILED,
+          );
+        }
         this.logger.log(
           `Webhook indicates payment failed: ${webhookData.code} - ${webhookData.desc}`,
         );
@@ -354,6 +385,27 @@ export class PaymentService {
     webhookData: WebhookData,
   ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
+      if (payment.appointmentId) {
+        const appointmentForStaleCheck = await manager.findOne(Appointment, {
+          where: { id: payment.appointmentId },
+          select: ['id', 'paymentId'],
+        });
+        if (
+          appointmentForStaleCheck &&
+          appointmentForStaleCheck.paymentId !== payment.id
+        ) {
+          payment.lastErrorAt = new Date();
+          payment.errorCode =
+            ERROR_MESSAGES.PAYMENT_STALE_FOR_APPOINTMENT_STATE;
+          payment.errorMessage = 'Stale payment callback ignored';
+          await manager.save(payment);
+          this.logger.warn(
+            `Ignored stale payment callback for payment ${payment.id}`,
+          );
+          return;
+        }
+      }
+
       payment.status = PaymentStatus.PAID;
       payment.paidAt = new Date(webhookData.data.transactionDateTime);
       payment.transactionReference = webhookData.data.reference;
@@ -457,6 +509,11 @@ export class PaymentService {
   private async syncPaymentStatusInternal(
     payment: Payment,
   ): Promise<PaymentResponseDto> {
+    if (this.isInvalidatedByReschedule(payment)) {
+      this.logger.warn(`Skip sync for invalidated payment ${payment.id}`);
+      return this.toDto(payment);
+    }
+
     // Get latest status from PayOS
     const payosInfo = await this.payosService.getPaymentInfo(
       Number(payment.orderCode),
@@ -509,6 +566,9 @@ export class PaymentService {
       purpose: payment.purpose,
       checkoutUrl: payment.checkoutUrl,
       qrCode: payment.qrCode,
+      bin: payment.bin,
+      accountNumber: payment.accountNumber,
+      accountName: payment.accountName,
       appointmentId: payment.appointmentId,
       paidAt: payment.paidAt,
       expiredAt: payment.expiredAt,
@@ -558,6 +618,12 @@ export class PaymentService {
           payosInfo.status === 'PAID' &&
           payment.status !== PaymentStatus.PAID
         ) {
+          if (this.isInvalidatedByReschedule(payment)) {
+            this.logger.warn(
+              `Ignored stale paid sync for invalidated payment ${payment.id}`,
+            );
+            continue;
+          }
           payment.status = PaymentStatus.PAID;
           payment.paidAt = new Date();
           statusChanged = true;
@@ -659,14 +725,18 @@ export class PaymentService {
     let count = 0;
 
     for (const payment of oldPayments) {
-      // TODO: Move to archive table when implemented
-      // await this.archivedPaymentRepository.save(payment);
-      // await this.paymentRepository.remove(payment);
-
       this.logger.debug(`Would archive payment ${payment.id}`);
       count++;
     }
 
     return count;
+  }
+
+  private isInvalidatedByReschedule(payment: Payment): boolean {
+    return (
+      payment.cancellationReason?.includes(
+        PaymentService.INVALIDATED_BY_RESCHEDULE,
+      ) ?? false
+    );
   }
 }

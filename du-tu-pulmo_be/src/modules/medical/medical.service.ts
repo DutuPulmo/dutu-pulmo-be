@@ -33,6 +33,7 @@ import { MedicalRecordStatusEnum } from '@/modules/common/enums/medical-record-s
 import { ERROR_MESSAGES } from '@/common/constants/error-messages.constant';
 import { MedicalRecordExaminationDto } from '@/modules/medical/dto/medical-record-examination.dto';
 import { PdfService } from '@/modules/pdf/pdf.service';
+import { validateTextFieldsPolicy as applyTextFieldsPolicy } from '@/common/utils/text-fields-policy.util';
 
 const VALID_TRANSITIONS: Record<MedicalRecordStatusEnum, MedicalRecordStatusEnum[]> = {
   [MedicalRecordStatusEnum.DRAFT]: [
@@ -294,6 +295,27 @@ export class MedicalService {
     });
   }
 
+  private validateTextFieldsPolicy(data: Partial<MedicalRecord>): void {
+    applyTextFieldsPolicy({
+      chiefComplaint: data.chiefComplaint,
+      textFields: [
+        data.presentIllness,
+        data.physicalExamNotes,
+        data.assessment,
+        data.diagnosis,
+        data.treatmentPlan,
+        data.medicalHistory,
+        data.surgicalHistory,
+        data.familyHistory,
+        data.followUpInstructions,
+        data.progressNotes,
+      ],
+      base64ErrorCode: ERROR_MESSAGES.MEDICAL_RECORD_BASE64_NOT_ALLOWED_IN_TEXT_FIELDS,
+      chiefComplaintErrorCode:
+        ERROR_MESSAGES.MEDICAL_RECORD_CHIEF_COMPLAINT_PLAIN_TEXT_ONLY,
+    });
+  }
+
   // ============================================================================
   // PRESCRIPTIONS
   // ============================================================================
@@ -403,13 +425,13 @@ export class MedicalService {
     }
 
     if (user.roles?.includes(RoleEnum.PATIENT)) {
-      if (prescription.patient.user.id !== user.id) {
+      if (prescription.patient.user.id !== user.userId) {
         throw new ForbiddenException(ERROR_MESSAGES.PRESCRIPTION_NOT_FOUND);
       }
     }
 
     if (user.roles?.includes(RoleEnum.DOCTOR)) {
-      if (prescription.doctor.user.id !== user.id) {
+      if (prescription.doctor.user.id !== user.userId) {
         throw new ForbiddenException(ERROR_MESSAGES.PRESCRIPTION_NOT_FOUND);
       }
     }
@@ -445,6 +467,7 @@ export class MedicalService {
     });
 
     if (!record) {
+      // Prefill only once from appointment data. Do not overwrite once a record exists.
       record = manager.create(MedicalRecord, {
         appointmentId: appointment.id,
         patientId: appointment.patientId,
@@ -513,6 +536,8 @@ export class MedicalService {
         );
       }
 
+      this.validateTextFieldsPolicy(data);
+
       if (!record) {
         record = manager.create(MedicalRecord, {
           appointmentId: appointment.id,
@@ -554,13 +579,6 @@ export class MedicalService {
         data.chiefComplaint !== appointment.chiefComplaint
       ) {
         appointment.chiefComplaint = data.chiefComplaint;
-        apptChanged = true;
-      }
-      if (
-        data.presentIllness &&
-        data.presentIllness !== appointment.patientNotes
-      ) {
-        appointment.patientNotes = data.presentIllness;
         apptChanged = true;
       }
       if (

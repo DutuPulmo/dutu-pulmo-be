@@ -20,6 +20,9 @@ import { DailyService } from '@/modules/video_call/daily.service';
 import { AppointmentMapperService } from '@/modules/appointment/services/appointment-mapper.service';
 import { diffMinutes, isBeforeVN, vnNow } from '@/common/datetime';
 import { ERROR_MESSAGES } from '@/common/constants/error-messages.constant';
+import { ConsultationPricingService } from '@/modules/doctor/services/consultation-pricing.service';
+import { RichTextService } from '@/modules/appointment/services/rich-text.service';
+import { validateTextFieldsPolicy } from '@/common/utils/text-fields-policy.util';
 
 @Injectable()
 export class AppointmentCreateService {
@@ -29,13 +32,9 @@ export class AppointmentCreateService {
     private readonly dataSource: DataSource,
     private readonly dailyService: DailyService,
     private readonly mapper: AppointmentMapperService,
+    private readonly pricingService: ConsultationPricingService,
+    private readonly richTextService: RichTextService,
   ) {}
-
-  private getFee(value: string | number | null | undefined): number {
-    if (value === null || value === undefined) return 0;
-    const num = Number(value);
-    return Number.isNaN(num) ? 0 : num;
-  }
 
   private generateAppointmentNumber(): string {
     const timestamp = Date.now().toString(36).toUpperCase();
@@ -46,6 +45,18 @@ export class AppointmentCreateService {
   async create(
     data: Partial<Appointment>,
   ): Promise<ResponseCommon<AppointmentResponseDto>> {
+    validateTextFieldsPolicy({
+      chiefComplaint: data.chiefComplaint,
+      chiefComplaintErrorCode:
+        ERROR_MESSAGES.APPOINTMENT_NOTES_CHIEF_COMPLAINT_PLAIN_TEXT_ONLY,
+    });
+
+    if (data.patientNotes) {
+      data.patientNotes = await this.richTextService.processPatientNotes(
+        data.patientNotes,
+      );
+    }
+
     if (!data.timeSlotId || !data.patientId) {
       this.logger.error('Time slot ID or patient ID is missing');
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
@@ -94,17 +105,29 @@ export class AppointmentCreateService {
         throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
       }
 
-      const existingAppointment = await manager.findOne(Appointment, {
-        where: {
-          patientId: data.patientId,
-          timeSlotId: data.timeSlotId,
-          status: Not(In([AppointmentStatusEnum.CANCELLED])),
-        },
-        lock: { mode: 'pessimistic_read' },
-      });
+      const existingAppointment = await manager
+        .createQueryBuilder(Appointment, 'apt')
+        .setLock('pessimistic_read')
+        .innerJoin('apt.timeSlot', 'existingSlot')
+        .where('apt.patientId = :patientId', { patientId: data.patientId })
+        .andWhere('apt.status NOT IN (:...statuses)', {
+          statuses: [AppointmentStatusEnum.CANCELLED],
+        })
+        .andWhere(
+          '(existingSlot.startTime < :newEndTime AND existingSlot.endTime > :newStartTime)',
+          {
+            newEndTime: slot.endTime,
+            newStartTime: slot.startTime,
+          },
+        )
+        .getOne();
+
+      console.log(existingAppointment);
 
       if (existingAppointment) {
-        this.logger.error('Existing appointment found');
+        this.logger.error(
+          'Patient has overlapping appointment conflicting with this time slot',
+        );
         throw new ConflictException(ERROR_MESSAGES.CONFLICT_DETECTED);
       }
 
@@ -124,20 +147,15 @@ export class AppointmentCreateService {
         hospitalId = doctor?.primaryHospitalId || undefined;
       }
 
-      let baseFee = this.getFee(schedule?.consultationFee);
-      if (baseFee === 0) {
-        baseFee = this.getFee(doctor?.defaultConsultationFee);
-      }
-
-      const discountPercent = schedule?.discountPercent || 0;
-      let finalFee = baseFee;
-
-      if (discountPercent > 0 && baseFee > 0) {
-        finalFee = baseFee * ((100 - discountPercent) / 100);
-      }
-
-      finalFee = Math.floor(finalFee);
-      const feeAmount = String(finalFee);
+      const baseFee = this.pricingService.resolveBaseFee(
+        schedule?.consultationFee,
+        doctor?.defaultConsultationFee,
+      );
+      const { finalFee } = this.pricingService.calculateFinalFee(
+        baseFee,
+        schedule?.discountPercent,
+      );
+      const feeAmount = this.pricingService.toVndString(finalFee);
       const isFree = finalFee === 0;
 
       const scheduledAt = slot.startTime;

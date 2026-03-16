@@ -26,6 +26,7 @@ import { SlotGeneratorService } from '@/modules/doctor/services/slot-generator.s
 import { PublicDoctorController } from '@/modules/doctor/controllers/public-doctor.controller';
 import { NotificationModule } from '@/modules/notification/notification.module';
 import { PublicTimeSlotController } from '@/modules/doctor/controllers/public-time-slot.controller';
+import { ConsultationPricingService } from '@/modules/doctor/services/consultation-pricing.service';
 
 @Module({
   imports: [
@@ -61,12 +62,14 @@ import { PublicTimeSlotController } from '@/modules/doctor/controllers/public-ti
     DoctorScheduleTimeOffService,
     DoctorSchedulePreviewService,
     SlotGeneratorService,
+    ConsultationPricingService,
   ],
   exports: [
     DoctorService,
     TimeSlotService,
     DoctorScheduleService,
     SlotGeneratorService,
+    ConsultationPricingService,
     TypeOrmModule,
   ],
 })

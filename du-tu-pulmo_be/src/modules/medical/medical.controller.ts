@@ -337,8 +337,13 @@ export class MedicalController {
   async completeMedicalRecord(
     @Param('id') id: string,
     @CurrentUser() user: JwtUser,
-  ): Promise<ResponseCommon<MedicalRecord>> {
-    return this.medicalService.completeMedicalRecord(id, user);
+  ): Promise<ResponseCommon<MedicalRecordResponseDto>> {
+    const result = await this.medicalService.completeMedicalRecord(id, user);
+    return new ResponseCommon(
+      result.code,
+      result.message,
+      this.toRecordDto(result.data as MedicalRecord),
+    );
   }
 
   @Post('records/:id/reopen')
@@ -352,8 +357,13 @@ export class MedicalController {
   async reopenMedicalRecord(
     @Param('id') id: string,
     @CurrentUser() user: JwtUser,
-  ): Promise<ResponseCommon<MedicalRecord>> {
-    return this.medicalService.reopenMedicalRecord(id, user);
+  ): Promise<ResponseCommon<MedicalRecordResponseDto>> {
+    const result = await this.medicalService.reopenMedicalRecord(id, user);
+    return new ResponseCommon(
+      result.code,
+      result.message,
+      this.toRecordDto(result.data as MedicalRecord),
+    );
   }
 
   // ==================== Specialized Views ====================
@@ -469,6 +479,7 @@ export class MedicalController {
     @Param('patientId') patientId: string,
     @CurrentUser() user: JwtUser,
   ): Promise<ResponseCommon<PrescriptionResponseDto[]>> {
+
     await this.validatePatientAccess(user, patientId);
 
     // Strict Mode for Doctors: Only return their own prescriptions
@@ -476,11 +487,27 @@ export class MedicalController {
       ? user.doctorId
       : undefined;
 
+    // Strict Mode for Patients: Only return their own prescriptions
+    const patientIdLogin = user.roles?.includes(RoleEnum.PATIENT)
+      ? user.userId
+      : undefined;
+
+    // Nếu login bằng patient nhưng cố xem patient khác
+    if (patientIdLogin && patientIdLogin !== patientId) {
+      throw new ForbiddenException(
+        'Patients can only view their own prescriptions',
+      );
+    }
+
     const result = await this.medicalService.findPrescriptionsByPatient(
       patientId,
       doctorId,
     );
-    const dtos = (result.data || []).map((p) => this.toPrescriptionDto(p));
+
+    const dtos = (result.data || []).map((p) =>
+      this.toPrescriptionDto(p),
+    );
+
     return new ResponseCommon(result.code, result.message, dtos);
   }
 

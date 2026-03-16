@@ -217,6 +217,18 @@ export class DoctorResponseDto {
   })
   defaultConsultationFee?: string | null;
 
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Bác sĩ có slot tư vấn online trong tương lai',
+  })
+  hasOnlineFutureSlots?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Bác sĩ có slot khám offline trong tương lai',
+  })
+  hasOfflineFutureSlots?: boolean;
+
   // ====== timestamps ======
   @ApiProperty({
     example: '2023-01-01T00:00:00.000Z',
@@ -274,6 +286,8 @@ export class DoctorResponseDto {
     totalReviews: number;
     verifiedAt?: Date;
     defaultConsultationFee?: string | null;
+    hasOnlineFutureSlots?: boolean;
+    hasOfflineFutureSlots?: boolean;
     createdAt: Date;
     updatedAt: Date;
   }): DoctorResponseDto {
@@ -311,6 +325,8 @@ export class DoctorResponseDto {
     dto.totalReviews = doctor.totalReviews;
     dto.verifiedAt = doctor.verifiedAt;
     dto.defaultConsultationFee = doctor.defaultConsultationFee;
+    dto.hasOnlineFutureSlots = doctor.hasOnlineFutureSlots;
+    dto.hasOfflineFutureSlots = doctor.hasOfflineFutureSlots;
     dto.createdAt = doctor.createdAt;
     dto.updatedAt = doctor.updatedAt;
     return dto;

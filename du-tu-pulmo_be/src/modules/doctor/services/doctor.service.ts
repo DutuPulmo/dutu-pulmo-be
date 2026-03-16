@@ -6,12 +6,13 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository, Not, IsNull } from 'typeorm';
+import { DataSource, Repository, Not, IsNull, In } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { Doctor } from '@/modules/doctor/entities/doctor.entity';
+import { TimeSlot } from '@/modules/doctor/entities/time-slot.entity';
 import { Account } from '@/modules/account/entities/account.entity';
 import { User } from '@/modules/user/entities/user.entity';
-import { FindDoctorsDto } from '@/modules/doctor/dto/find-doctors.dto';
+import { FindDoctorsQueryDto } from '@/modules/doctor/dto/find-doctors.dto';
 import { CreateDoctorDto } from '@/modules/doctor/dto/create-doctor.dto';
 import { PaginatedResponseDto } from '@/common/dto/pagination.dto';
 import { UpdateDoctorDto } from '@/modules/doctor/dto/update-doctor.dto';
@@ -20,6 +21,9 @@ import { RoleEnum } from '@/modules/common/enums/role.enum';
 import { VerificationStatus } from '@/modules/common/enums/doctor-verification-status.enum';
 import { ERROR_MESSAGES } from '@/common/constants/error-messages.constant';
 import { applyPaginationAndSort } from '@/common/utils/pagination.util';
+import { AppointmentTypeEnum } from '@/modules/common/enums/appointment-type.enum';
+import { mapAppointmentTypeFilterToSlotType } from '@/modules/doctor/dto/appointment-type-filter.enum';
+import { vnNow } from '@/common/datetime';
 
 @Injectable()
 export class DoctorService {
@@ -28,6 +32,8 @@ export class DoctorService {
   constructor(
     @InjectRepository(Doctor)
     private readonly doctorRepository: Repository<Doctor>,
+    @InjectRepository(TimeSlot)
+    private readonly timeSlotRepository: Repository<TimeSlot>,
     @InjectRepository(Account)
     private readonly accountRepository: Repository<Account>,
     private readonly dataSource: DataSource,
@@ -41,9 +47,12 @@ export class DoctorService {
   }
 
   async findAllPaginated(
-    dto: FindDoctorsDto,
+    dto: FindDoctorsQueryDto,
   ): Promise<ResponseCommon<PaginatedResponseDto<Doctor>>> {
-    const { search, specialty, hospitalId } = dto;
+    const { search, specialty, hospitalId, appointmentType } = dto;
+    const now = vnNow();
+    const appointmentSlotType =
+      mapAppointmentTypeFilterToSlotType(appointmentType);
 
     const queryBuilder = this.doctorRepository
       .createQueryBuilder('doctor')
@@ -71,6 +80,25 @@ export class DoctorService {
       });
     }
 
+    if (appointmentSlotType) {
+      queryBuilder.andWhere(
+        `EXISTS (
+          SELECT 1
+          FROM time_slots slot
+          WHERE slot.doctor_id = doctor.id
+            AND slot.deleted_at IS NULL
+            AND slot.start_time >= :slotNow
+            AND slot.is_available = true
+            AND slot.booked_count < slot.capacity
+            AND :slotType = ANY(slot.allowed_appointment_types)
+        )`,
+        {
+          slotNow: now,
+          slotType: appointmentSlotType,
+        },
+      );
+    }
+
     applyPaginationAndSort(
       queryBuilder,
       dto,
@@ -80,11 +108,23 @@ export class DoctorService {
     );
 
     const [items, totalItems] = await queryBuilder.getManyAndCount();
+    const availabilityMap = await this.getDoctorAvailabilityMap(
+      items.map((item) => item.id),
+    );
+    const withAvailability = items.map((doctor) =>
+      Object.assign(
+        doctor,
+        availabilityMap.get(doctor.id) ?? {
+          hasOnlineFutureSlots: false,
+          hasOfflineFutureSlots: false,
+        },
+      ),
+    );
     const limit = dto.limit || 10;
     const page = dto.page || 1;
 
     const paginatedData = new PaginatedResponseDto(
-      items,
+      withAvailability,
       totalItems,
       page,
       limit,
@@ -97,7 +137,21 @@ export class DoctorService {
       where: { id },
       relations: ['user', 'primaryHospital', 'user.account'],
     });
-    return new ResponseCommon(200, 'SUCCESS', doctor);
+    if (!doctor) {
+      return new ResponseCommon(200, 'SUCCESS', null);
+    }
+
+    const availabilityMap = await this.getDoctorAvailabilityMap([doctor.id]);
+    const availability = availabilityMap.get(doctor.id) ?? {
+      hasOnlineFutureSlots: false,
+      hasOfflineFutureSlots: false,
+    };
+
+    return new ResponseCommon(
+      200,
+      'SUCCESS',
+      Object.assign(doctor, availability),
+    );
   }
 
   async findByUserId(userId: string): Promise<ResponseCommon<Doctor | null>> {
@@ -106,6 +160,68 @@ export class DoctorService {
       relations: ['user', 'primaryHospital'],
     });
     return new ResponseCommon(200, 'SUCCESS', doctor);
+  }
+
+  private async getDoctorAvailabilityMap(doctorIds: string[]): Promise<
+    Map<
+      string,
+      {
+        hasOnlineFutureSlots: boolean;
+        hasOfflineFutureSlots: boolean;
+      }
+    >
+  > {
+    const map = new Map<
+      string,
+      {
+        hasOnlineFutureSlots: boolean;
+        hasOfflineFutureSlots: boolean;
+      }
+    >();
+
+    if (doctorIds.length === 0) {
+      return map;
+    }
+
+    const now = vnNow();
+    const rows = await this.timeSlotRepository
+      .createQueryBuilder('slot')
+      .select('slot.doctorId', 'doctorId')
+      .addSelect(
+        `BOOL_OR(:videoType = ANY(slot.allowedAppointmentTypes))`,
+        'hasOnlineFutureSlots',
+      )
+      .addSelect(
+        `BOOL_OR(:offlineType = ANY(slot.allowedAppointmentTypes))`,
+        'hasOfflineFutureSlots',
+      )
+      .where('slot.doctorId IN (:...doctorIds)', { doctorIds })
+      .andWhere('slot.startTime >= :now', { now })
+      .andWhere('slot.isAvailable = true')
+      .andWhere('slot.bookedCount < slot.capacity')
+      .groupBy('slot.doctorId')
+      .setParameters({
+        videoType: AppointmentTypeEnum.VIDEO,
+        offlineType: AppointmentTypeEnum.IN_CLINIC,
+      })
+      .getRawMany<{
+        doctorId: string;
+        hasOnlineFutureSlots: boolean | 'true' | 'false';
+        hasOfflineFutureSlots: boolean | 'true' | 'false';
+      }>();
+
+    for (const row of rows) {
+      map.set(row.doctorId, {
+        hasOnlineFutureSlots:
+          row.hasOnlineFutureSlots === true ||
+          row.hasOnlineFutureSlots === 'true',
+        hasOfflineFutureSlots:
+          row.hasOfflineFutureSlots === true ||
+          row.hasOfflineFutureSlots === 'true',
+      });
+    }
+
+    return map;
   }
 
   async create(dto: CreateDoctorDto): Promise<ResponseCommon<Doctor>> {
@@ -303,3 +419,4 @@ export class DoctorService {
     return new ResponseCommon(200, 'SUCCESS', doctor);
   }
 }
+

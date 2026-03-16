@@ -8,6 +8,9 @@ import {
 import { ValidationPipe } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { AllExceptionsFilter } from '@/common/filters/all-exceptions.filter';
+import * as express from 'express';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -24,6 +27,10 @@ function getRolesFromOperation(operation: unknown): string[] | undefined {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Set request body limit
+  app.use(express.json({ limit: '20mb' }));
+  app.use(express.urlencoded({ limit: '20mb', extended: true }));
 
   // Enable CORS
   app.enableCors();
@@ -141,14 +148,33 @@ async function bootstrap() {
     customSiteTitle: 'DuTu Pulmo API Docs',
   });
 
+  const exportPath = process.env.EXPORT_OPENAPI_PATH;
+  const exportPatientPath = process.env.EXPORT_PATIENT_OPENAPI_PATH;
+  if (exportPath || exportPatientPath) {
+    if (exportPath) {
+      mkdirSync(dirname(exportPath), { recursive: true });
+      writeFileSync(exportPath, JSON.stringify(document, null, 2), 'utf8');
+      console.log(`Exported OpenAPI: ${exportPath}`);
+    }
+    if (exportPatientPath) {
+      mkdirSync(dirname(exportPatientPath), { recursive: true });
+      writeFileSync(
+        exportPatientPath,
+        JSON.stringify(patientDocument, null, 2),
+        'utf8',
+      );
+      console.log(`Exported patient OpenAPI: ${exportPatientPath}`);
+    }
+    await app.close();
+    return;
+  }
+
   await app.listen(port, host);
 
   console.log(`🚀 Application running on: http://${host}:${port}`);
   console.log(`📚 Swagger API Docs: http://${host}:${port}/docs`);
   console.log(`📚 Swagger Admin API Docs: http://${host}:${port}/docs/admin`);
-  console.log(
-    `📚 Swagger Doctor API Docs: http://${host}:${port}/docs/doctor`,
-  );
+  console.log(`📚 Swagger Doctor API Docs: http://${host}:${port}/docs/doctor`);
   console.log(
     `📚 Swagger Patient API Docs: http://${host}:${port}/docs/patient`,
   );

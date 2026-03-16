@@ -139,7 +139,7 @@ export class Appointment {
   paidAmount: string;
 
   @Column({ name: 'payment_id', type: 'uuid', nullable: true })
-  paymentId: string;
+  paymentId: string | null;
 
   @Column({ default: false })
   refunded: boolean;

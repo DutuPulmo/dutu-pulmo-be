@@ -7,7 +7,14 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, DataSource, MoreThanOrEqual, In, SelectQueryBuilder } from 'typeorm';
+import {
+  Repository,
+  Between,
+  DataSource,
+  MoreThanOrEqual,
+  In,
+  SelectQueryBuilder,
+} from 'typeorm';
 import { TimeSlot } from '@/modules/doctor/entities/time-slot.entity';
 import {
   CreateTimeSlotDto,
@@ -17,6 +24,11 @@ import { ResponseCommon } from '@/common/dto/response.dto';
 import { DoctorSchedule } from '@/modules/doctor/entities/doctor-schedule.entity';
 import { AppointmentTypeEnum } from 'src/modules/common/enums/appointment-type.enum';
 import { vnNow, startOfDayVN, endOfDayVN } from '@/common/datetime';
+import { ConsultationPricingService } from '@/modules/doctor/services/consultation-pricing.service';
+import {
+  AppointmentTypeFilterEnum,
+  mapAppointmentTypeFilterToSlotType,
+} from '@/modules/doctor/dto/appointment-type-filter.enum';
 
 const MAX_SLOTS_PER_REQUEST = 100;
 const MAX_SLOTS_PER_DAY = 50;
@@ -35,6 +47,7 @@ export class TimeSlotService {
     @InjectRepository(DoctorSchedule)
     private readonly scheduleRepository: Repository<DoctorSchedule>,
     private readonly dataSource: DataSource,
+    private readonly pricingService: ConsultationPricingService,
   ) {}
 
   async findById(id: string): Promise<ResponseCommon<TimeSlot>> {
@@ -46,7 +59,8 @@ export class TimeSlotService {
       this.logger.error('Slot not found');
       throw new NotFoundException(ERROR_MESSAGES.RESOURCE_NOT_FOUND);
     }
-    return new ResponseCommon(200, 'SUCCESS', slot);
+    const [enriched] = await this.enrichSlotsWithPricing([slot]);
+    return new ResponseCommon(200, 'SUCCESS', enriched);
   }
 
   async findByIdWithRelations(id: string): Promise<ResponseCommon<TimeSlot>> {
@@ -58,7 +72,8 @@ export class TimeSlotService {
       this.logger.error('Slot not found');
       throw new NotFoundException(ERROR_MESSAGES.RESOURCE_NOT_FOUND);
     }
-    return new ResponseCommon(200, 'SUCCESS', slot);
+    const [enriched] = await this.enrichSlotsWithPricing([slot]);
+    return new ResponseCommon(200, 'SUCCESS', enriched);
   }
 
   async findByDoctorId(doctorId: string): Promise<ResponseCommon<TimeSlot[]>> {
@@ -71,21 +86,19 @@ export class TimeSlotService {
       },
       order: { startTime: 'ASC' },
     });
-    return new ResponseCommon(
-      200,
-      'SUCCESS',
-      slots.filter((s) => s.bookedCount < s.capacity),
-    );
+    const filteredSlots = slots.filter((s) => s.bookedCount < s.capacity);
+    const enrichedSlots = await this.enrichSlotsWithPricing(filteredSlots);
+    return new ResponseCommon(200, 'SUCCESS', enrichedSlots);
   }
-  
-  
+
   private buildAvailableSlotQuery(
     doctorId: string,
     effectiveStart: Date,
     effectiveEnd: Date,
     now: Date,
+    appointmentType?: AppointmentTypeFilterEnum,
   ): SelectQueryBuilder<TimeSlot> {
-    return this.timeSlotRepository
+    const qb = this.timeSlotRepository
       .createQueryBuilder('slot')
       .leftJoin('slot.schedule', 'schedule')
       .where('slot.doctorId = :doctorId', { doctorId })
@@ -103,19 +116,36 @@ export class TimeSlotService {
         `slot.startTime <= :now::timestamptz + COALESCE(schedule.maxAdvanceBookingDays, 30) * interval '1 day'`,
         { now },
       );
+
+    const slotType = mapAppointmentTypeFilterToSlotType(appointmentType);
+    if (slotType) {
+      qb.andWhere(':slotType = ANY(slot.allowedAppointmentTypes)', {
+        slotType,
+      });
+    }
+
+    return qb;
   }
 
   async findAvailableSlots(
     doctorId: string,
     startDate: Date,
     endDate: Date,
+    appointmentType: AppointmentTypeFilterEnum = AppointmentTypeFilterEnum.ALL,
   ): Promise<TimeSlot[]> {
     const now = vnNow();
     const effectiveStart = startDate > now ? startDate : now;
 
-    return this.buildAvailableSlotQuery(doctorId, effectiveStart, endDate, now)
+    return this.buildAvailableSlotQuery(
+      doctorId,
+      effectiveStart,
+      endDate,
+      now,
+      appointmentType,
+    )
       .orderBy('slot.startTime', 'ASC')
-      .getMany();
+      .getMany()
+      .then((slots) => this.enrichSlotsWithPricing(slots));
   }
 
   async findSlotsInRange(
@@ -135,6 +165,7 @@ export class TimeSlotService {
   async findAvailableSlotsByDate(
     doctorId: string,
     date: Date,
+    appointmentType: AppointmentTypeFilterEnum = AppointmentTypeFilterEnum.ALL,
   ): Promise<ResponseCommon<TimeSlot[]>> {
     if (isNaN(date.getTime())) {
       this.logger.error('Invalid date');
@@ -152,8 +183,74 @@ export class TimeSlotService {
     const dayStart = startOfDayVN(date);
     const dayEnd = endOfDayVN(date);
 
-    const slots = await this.findAvailableSlots(doctorId, dayStart, dayEnd);
+    const slots = await this.findAvailableSlots(
+      doctorId,
+      dayStart,
+      dayEnd,
+      appointmentType,
+    );
     return new ResponseCommon(200, 'SUCCESS', slots);
+  }
+
+  private async enrichSlotsWithPricing(slots: TimeSlot[]): Promise<TimeSlot[]> {
+    if (slots.length === 0) return slots;
+    const ids = slots.map((slot) => slot.id);
+
+    const rawRows = await this.timeSlotRepository
+      .createQueryBuilder('slot')
+      .leftJoin('slot.schedule', 'schedule')
+      .leftJoin('slot.doctor', 'doctor')
+      .select('slot.id', 'slot_id')
+      .addSelect('schedule.consultationFee', 'schedule_consultation_fee')
+      .addSelect('schedule.discountPercent', 'schedule_discount_percent')
+      .addSelect('doctor.defaultConsultationFee', 'doctor_default_fee')
+      .where('slot.id IN (:...ids)', { ids })
+      .getRawMany<{
+        slot_id: string;
+        schedule_consultation_fee: string | null;
+        schedule_discount_percent: number | null;
+        doctor_default_fee: string | null;
+      }>();
+
+    const feeMap = new Map(
+      rawRows.map((row) => {
+        // schedule can be null; fallback to doctor default fee.
+        const baseFee = this.pricingService.resolveBaseFee(
+          row.schedule_consultation_fee,
+          row.doctor_default_fee,
+        );
+        const pricing = this.pricingService.calculateFinalFee(
+          baseFee,
+          row.schedule_discount_percent,
+        );
+        return [
+          row.slot_id,
+          {
+            baseConsultationFee:
+              pricing.baseFee > 0
+                ? this.pricingService.toVndString(pricing.baseFee)
+                : null,
+            discountPercent: pricing.discountPercent,
+            finalConsultationFee: this.pricingService.toVndString(
+              pricing.finalFee,
+            ),
+            currency: 'VND' as const,
+          },
+        ];
+      }),
+    );
+
+    return slots.map((slot) =>
+      Object.assign(
+        slot,
+        feeMap.get(slot.id) ?? {
+          baseConsultationFee: null,
+          discountPercent: 0,
+          finalConsultationFee: '0',
+          currency: 'VND' as const,
+        },
+      ),
+    );
   }
 
   private async checkOverlap(
@@ -199,7 +296,9 @@ export class TimeSlotService {
     const earliestAllowed = new Date(now.getTime() + minBookingBufferMs);
 
     if (startTime < earliestAllowed) {
-      this.logger.error('Invalid time range. Start time is before earliest allowed');
+      this.logger.error(
+        'Invalid time range. Start time is before earliest allowed',
+      );
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
     }
 
@@ -209,7 +308,9 @@ export class TimeSlotService {
     );
 
     if (startTime > maxDate) {
-      this.logger.error('Invalid time range. Start time is after max advance days');
+      this.logger.error(
+        'Invalid time range. Start time is after max advance days',
+      );
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
     }
 
@@ -424,7 +525,9 @@ export class TimeSlotService {
     const slot = slotResult.data!;
 
     if (!isAvailable && slot.bookedCount > 0) {
-      this.logger.error('Invalid request. Slot is not available but has booked count');
+      this.logger.error(
+        'Invalid request. Slot is not available but has booked count',
+      );
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
     }
 
@@ -453,7 +556,9 @@ export class TimeSlotService {
     }
 
     if (slotIds.length > 100) {
-      this.logger.error('Invalid request. Too many slots to toggle availability');
+      this.logger.error(
+        'Invalid request. Too many slots to toggle availability',
+      );
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
     }
 
@@ -561,7 +666,9 @@ export class TimeSlotService {
     }
 
     if (dto.isAvailable === false && existing.bookedCount > 0) {
-      this.logger.error('Invalid request. Slot is not available but has booked count');
+      this.logger.error(
+        'Invalid request. Slot is not available but has booked count',
+      );
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
     }
 
@@ -659,6 +766,7 @@ export class TimeSlotService {
     doctorId: string,
     fromDate: Date,
     toDate: Date,
+    appointmentType: AppointmentTypeFilterEnum = AppointmentTypeFilterEnum.ALL,
   ): Promise<ResponseCommon<any[]>> {
     const now = vnNow();
     const todayStart = startOfDayVN(now);
@@ -668,12 +776,12 @@ export class TimeSlotService {
       fromDateStart.getTime() === todayStart.getTime() ? now : fromDateStart;
     const effectiveEnd = endOfDayVN(toDate);
 
-
     const result = await this.buildAvailableSlotQuery(
       doctorId,
       effectiveStart,
       effectiveEnd,
       now,
+      appointmentType,
     )
       .select(
         "TO_CHAR(slot.startTime AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD')",
@@ -694,7 +802,11 @@ export class TimeSlotService {
       resultMap.set(item.date, parseInt(item.count, 10));
     }
 
-    const summary: Array<{ date: string; count: number; hasAvailability: boolean }> = [];
+    const summary: Array<{
+      date: string;
+      count: number;
+      hasAvailability: boolean;
+    }> = [];
     const cursor = startOfDayVN(fromDate);
     const rangeEnd = startOfDayVN(toDate);
 

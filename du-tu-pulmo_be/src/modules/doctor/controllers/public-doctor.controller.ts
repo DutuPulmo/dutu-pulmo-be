@@ -10,11 +10,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { DoctorService } from '@/modules/doctor/services/doctor.service';
-import { FindDoctorsDto } from '@/modules/doctor/dto/find-doctors.dto';
+import { FindDoctorsQueryDto } from '@/modules/doctor/dto/find-doctors.dto';
 import { ResponseCommon } from '@/common/dto/response.dto';
 import { DoctorResponseDto } from '@/modules/doctor/dto/doctor-response.dto';
 import { PaginatedResponseDto } from '@/common/dto/pagination.dto';
 import { Doctor } from '@/modules/doctor/entities/doctor.entity';
+import { SpecialtyEnum } from '@/modules/common/enums/specialty.enum';
 
 @ApiTags('Public - Doctors')
 @Controller('public/doctors')
@@ -25,7 +26,7 @@ export class PublicDoctorController {
   @ApiOperation({ summary: 'Lấy danh sách bác sĩ công khai (có phân trang)' })
   @ApiResponse({ status: HttpStatus.OK, type: PaginatedResponseDto })
   async findAll(
-    @Query() dto: FindDoctorsDto,
+    @Query() dto: FindDoctorsQueryDto,
   ): Promise<ResponseCommon<PaginatedResponseDto<DoctorResponseDto>>> {
     const response = await this.doctorService.findAllPaginated(dto);
     const fallback = new PaginatedResponseDto<Doctor>(
@@ -42,6 +43,18 @@ export class PublicDoctorController {
       items,
       meta: paginated.meta,
     });
+  }
+
+  @Get('specialties')
+  @ApiOperation({ summary: 'Lấy danh sách chuyên khoa' })
+  @ApiResponse({ status: HttpStatus.OK, type: [String] })
+  async getSpecialties(): Promise<ResponseCommon<string[]>> {
+    const specialties = Object.values(SpecialtyEnum);
+    return new ResponseCommon(
+      200,
+      'Lấy danh sách chuyên khoa thành công',
+      specialties,
+    );
   }
 
   @Get(':id')
@@ -80,3 +93,4 @@ export class PublicDoctorController {
     return dto;
   }
 }
+
