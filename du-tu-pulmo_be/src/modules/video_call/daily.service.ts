@@ -180,8 +180,9 @@ export class DailyService {
       ),
     );
 
-    this.logger.log(`Created meeting token for user ${userId} in room ${roomName}`);
+    this.logger.log(
+      `Created meeting token for user ${userId} in room ${roomName}`,
+    );
     return response.data;
   }
-
 }

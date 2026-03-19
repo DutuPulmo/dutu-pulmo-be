@@ -60,7 +60,7 @@ export class FavoriteService {
     });
 
     const saved = await this.favoriteRepository.save(favorite);
-    
+
     // Re-fetch with relations to return full data
     const fullFavorite = await this.favoriteRepository.findOne({
       where: { id: saved.id },
@@ -86,7 +86,13 @@ export class FavoriteService {
   async findOne(id: string): Promise<ResponseCommon<Favorite | null>> {
     const favorite = await this.favoriteRepository.findOne({
       where: { id },
-      relations: ['user', 'doctor', 'doctor.user', 'doctor.user.account', 'hospital'],
+      relations: [
+        'user',
+        'doctor',
+        'doctor.user',
+        'doctor.user.account',
+        'hospital',
+      ],
     });
     return new ResponseCommon(200, 'SUCCESS', favorite);
   }

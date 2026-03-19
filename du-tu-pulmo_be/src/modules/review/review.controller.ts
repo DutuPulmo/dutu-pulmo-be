@@ -27,11 +27,11 @@ import { ResponseCommon } from '@/common/dto/response.dto';
 
 @ApiTags('Reviews')
 @Controller('reviews')
-@ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard)
 export class ReviewController {
   constructor(private readonly reviewService: ReviewService) {}
 
+  @ApiBearerAuth('JWT-auth')
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Tạo đánh giá bác sĩ mới' })
@@ -48,7 +48,10 @@ export class ReviewController {
     @Body() createReviewDto: CreateReviewDto,
     @CurrentUser() user: JwtUser,
   ): Promise<ResponseCommon<ReviewResponseDto>> {
-    const response = await this.reviewService.create(createReviewDto, user.userId);
+    const response = await this.reviewService.create(
+      createReviewDto,
+      user.userId,
+    );
     return new ResponseCommon(
       response.code,
       response.message,
@@ -111,6 +114,7 @@ export class ReviewController {
     );
   }
 
+  @ApiBearerAuth('JWT-auth')
   @Patch(':id')
   @ApiOperation({ summary: 'Cập nhật đánh giá' })
   @ApiResponse({ status: HttpStatus.OK, type: ReviewResponseDto })
@@ -131,6 +135,7 @@ export class ReviewController {
     );
   }
 
+  @ApiBearerAuth('JWT-auth')
   @Patch(':id/response')
   @ApiOperation({ summary: 'Bác sĩ phản hồi đánh giá' })
   @ApiResponse({ status: HttpStatus.OK, type: ReviewResponseDto })
@@ -152,6 +157,7 @@ export class ReviewController {
     );
   }
 
+  @ApiBearerAuth('JWT-auth')
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Xóa đánh giá' })

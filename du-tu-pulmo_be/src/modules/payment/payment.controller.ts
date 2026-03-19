@@ -183,7 +183,7 @@ export class PaymentController {
     // Get appointmentId for the redirect
     const payment = await this.paymentService.getPaymentByorderCode(orderCode);
     res.redirect(
-      `${frontendUrl}/payment/success?appointmentId=${payment.appointmentId}`,
+      `${frontendUrl}/payment/success?code=00&status=PAID&cancel=false&id=${payment.id}&orderCode=${payment.orderCode}`,
     );
   }
 

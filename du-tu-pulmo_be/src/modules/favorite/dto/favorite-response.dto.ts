@@ -34,15 +34,15 @@ export class FavoriteResponseDto {
     dto.userId = favorite.userId;
     dto.doctorId = favorite.doctorId ?? undefined;
     dto.hospitalId = favorite.hospitalId ?? undefined;
-    
+
     if (favorite.doctor) {
       dto.doctor = DoctorResponseDto.fromEntity(favorite.doctor);
     }
-    
+
     if (favorite.hospital) {
       dto.hospital = HospitalResponseDto.fromEntity(favorite.hospital);
     }
-    
+
     dto.createdAt = favorite.createdAt;
     return dto;
   }

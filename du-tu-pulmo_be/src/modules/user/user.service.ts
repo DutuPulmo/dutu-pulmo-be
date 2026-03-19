@@ -191,7 +191,9 @@ export class UserService {
       await this.userRepository.save(user);
     }
 
-    return new ResponseCommon(200, 'SUCCESS', { message: 'FCM Token added successfully' });
+    return new ResponseCommon(200, 'SUCCESS', {
+      message: 'FCM Token added successfully',
+    });
   }
 
   async removeFcmToken(userId: string, token: string): Promise<ResponseCommon> {
@@ -201,10 +203,12 @@ export class UserService {
     }
 
     if (user.fcmTokens && user.fcmTokens.includes(token)) {
-      user.fcmTokens = user.fcmTokens.filter(t => t !== token);
+      user.fcmTokens = user.fcmTokens.filter((t) => t !== token);
       await this.userRepository.save(user);
     }
 
-    return new ResponseCommon(200, 'SUCCESS', { message: 'FCM Token removed successfully' });
+    return new ResponseCommon(200, 'SUCCESS', {
+      message: 'FCM Token removed successfully',
+    });
   }
 }
