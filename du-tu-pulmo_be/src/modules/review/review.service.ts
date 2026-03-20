@@ -195,7 +195,7 @@ export class ReviewService {
     // Clear rating from Appointment
     if (review.appointmentId) {
       await this.appointmentRepository.update(review.appointmentId, {
-        patientRating: null as any,
+        patientRating: null,
       });
     }
 
