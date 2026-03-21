@@ -54,10 +54,12 @@ export class AppointmentSchedulerService {
 
       for (const appointment of oldAppointments) {
         try {
-          await this.dailyService.deleteRoom(appointment.dailyCoChannel);
+          await this.dailyService.deleteRoom(appointment.dailyCoChannel!);
 
           await this.appointmentRepository.update(appointment.id, {
-            dailyCoChannel: undefined,
+            dailyCoChannel: null,
+            meetingUrl: null,
+            meetingRoomId: null,
           });
 
           this.logger.log(

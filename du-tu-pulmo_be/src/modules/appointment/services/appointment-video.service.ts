@@ -24,7 +24,7 @@ import { NotificationService } from '@/modules/notification/notification.service
 type VideoJoinWindowInput = {
   status: AppointmentStatusEnum;
   scheduledAt: Date;
-  meetingUrl?: string;
+  meetingUrl?: string | null;
 };
 
 export type VideoJoinInfo = {
@@ -306,7 +306,7 @@ export class AppointmentVideoService {
 
     try {
       const tokenData = await this.dailyService.createMeetingToken(
-        roomName,
+        roomName!,
         userId,
         userName,
         isDoctor,
@@ -323,7 +323,7 @@ export class AppointmentVideoService {
 
       return {
         token: tokenData.token,
-        url: roomUrl,
+        url: roomUrl!,
         appointment: appointmentData,
       };
     } catch (error) {
