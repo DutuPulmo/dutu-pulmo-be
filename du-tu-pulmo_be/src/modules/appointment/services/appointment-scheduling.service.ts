@@ -26,6 +26,8 @@ import { DailyService } from '@/modules/video_call/daily.service';
 import { CallStateService } from '@/modules/video_call/call-state.service';
 import { AppointmentMapperService } from '@/modules/appointment/services/appointment-mapper.service';
 import { ConsultationPricingService } from '@/modules/doctor/services/consultation-pricing.service';
+import { NotificationService } from '@/modules/notification/notification.service';
+import { NotificationTypeEnum } from '@/modules/common/enums/notification-type.enum';
 
 @Injectable()
 export class AppointmentSchedulingService {
@@ -38,6 +40,7 @@ export class AppointmentSchedulingService {
     private readonly mapper: AppointmentMapperService,
     private readonly payosService: PayosService,
     private readonly pricingService: ConsultationPricingService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async cancel(
@@ -165,6 +168,46 @@ export class AppointmentSchedulingService {
 
       return saved;
     });
+
+    const apptWithRelations = await this.dataSource
+      .getRepository(Appointment)
+      .findOne({
+        where: { id },
+        relations: ['patient', 'patient.user', 'doctor', 'doctor.user'],
+      });
+
+    if (apptWithRelations) {
+      const cancellerName =
+        cancelledBy === 'DOCTOR'
+          ? 'Bác sĩ'
+          : cancelledBy === 'PATIENT'
+            ? 'Bệnh nhân'
+            : 'Hệ thống';
+
+      // Notify patient
+      if (apptWithRelations.patient?.user?.id) {
+        void this.notificationService.createNotification({
+          userId: apptWithRelations.patient.user.id,
+          type: NotificationTypeEnum.APPOINTMENT,
+          title: 'Lịch hẹn đã bị hủy',
+          content: `Lịch hẹn ${result.appointmentNumber} đã bị hủy bởi ${cancellerName}. Lý do: ${reason}.`,
+          refId: id,
+          refType: 'APPOINTMENT',
+        });
+      }
+
+      // Notify doctor
+      if (apptWithRelations.doctor?.user?.id) {
+        void this.notificationService.createNotification({
+          userId: apptWithRelations.doctor.user.id,
+          type: NotificationTypeEnum.APPOINTMENT,
+          title: 'Lịch hẹn đã bị hủy',
+          content: `Lịch hẹn ${result.appointmentNumber} đã bị hủy bởi ${cancellerName}.`,
+          refId: id,
+          refType: 'APPOINTMENT',
+        });
+      }
+    }
 
     return new ResponseCommon(
       200,
@@ -371,6 +414,44 @@ export class AppointmentSchedulingService {
 
       return manager.save(appointment);
     });
+
+    const apptWithRelations = await this.dataSource
+      .getRepository(Appointment)
+      .findOne({
+        where: { id: appointmentId },
+        relations: ['patient', 'patient.user', 'doctor', 'doctor.user'],
+      });
+
+    if (apptWithRelations) {
+      const newDate = result.scheduledAt.toLocaleDateString('vi-VN', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+
+      if (apptWithRelations.patient?.user?.id) {
+        void this.notificationService.createNotification({
+          userId: apptWithRelations.patient.user.id,
+          type: NotificationTypeEnum.APPOINTMENT,
+          title: 'Đổi lịch thành công',
+          content: `Lịch hẹn đã được dời sang ${newDate}.`,
+          refId: appointmentId,
+          refType: 'APPOINTMENT',
+        });
+      }
+
+      if (apptWithRelations.doctor?.user?.id) {
+        void this.notificationService.createNotification({
+          userId: apptWithRelations.doctor.user.id,
+          type: NotificationTypeEnum.APPOINTMENT,
+          title: 'Lịch hẹn đã được dời',
+          content: `Lịch hẹn đã được bệnh nhân dời sang ${newDate}.`,
+          refId: appointmentId,
+          refType: 'APPOINTMENT',
+        });
+      }
+    }
 
     return new ResponseCommon(
       200,

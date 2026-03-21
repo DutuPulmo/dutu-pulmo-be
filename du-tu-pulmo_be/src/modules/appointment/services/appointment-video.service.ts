@@ -18,6 +18,8 @@ import { AppointmentResponseDto } from '@/modules/appointment/dto/appointment-re
 import { ResponseCommon } from '@/common/dto/response.dto';
 import { ERROR_MESSAGES } from '@/common/constants/error-messages.constant';
 import { CHECKIN_TIME_THRESHOLDS } from '@/modules/appointment/appointment.constants';
+import { NotificationTypeEnum } from '@/modules/common/enums/notification-type.enum';
+import { NotificationService } from '@/modules/notification/notification.service';
 
 type VideoJoinWindowInput = {
   status: AppointmentStatusEnum;
@@ -51,6 +53,7 @@ export class AppointmentVideoService {
     private readonly callStateService: CallStateService,
     private readonly medicalService: MedicalService,
     private readonly appointmentReadService: AppointmentReadService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   getVideoJoinInfo(
@@ -207,6 +210,10 @@ export class AppointmentVideoService {
       }
     }
 
+    let patientUserIdToNotify: string | null = null;
+    let doctorUserIdToNotify: string | null = null;
+    let appointmentNumber: string | null = null;
+
     appointment = await this.dataSource.transaction(async (manager) => {
       const apt = await manager.findOne(Appointment, {
         where: { id: appointmentId },
@@ -217,6 +224,10 @@ export class AppointmentVideoService {
         this.logger.error('Appointment not found');
         throw new NotFoundException(ERROR_MESSAGES.RESOURCE_NOT_FOUND);
       }
+      const aptFull = await manager.findOne(Appointment, {
+        where: { id: appointmentId },
+        relations: ['patient', 'patient.user', 'doctor', 'doctor.user'],
+      });
 
       let statusChanged = false;
       let enteredInProgress = false;
@@ -252,6 +263,16 @@ export class AppointmentVideoService {
         await manager.save(apt);
       }
 
+      if (isDoctor && apt.status === AppointmentStatusEnum.IN_PROGRESS) {
+        patientUserIdToNotify = aptFull?.patient?.user?.id ?? null;
+        appointmentNumber = apt.appointmentNumber;
+      }
+
+      if (!isDoctor && apt.status === AppointmentStatusEnum.CHECKED_IN) {
+        doctorUserIdToNotify = aptFull?.doctor?.user?.id ?? null;
+        appointmentNumber = apt.appointmentNumber;
+      }
+
       if (enteredInProgress) {
         await this.medicalService.upsertEncounterInTx(manager, apt);
         this.logger.log(
@@ -260,6 +281,28 @@ export class AppointmentVideoService {
       }
       return apt;
     });
+
+    if (patientUserIdToNotify && appointmentNumber) {
+      void this.notificationService.createNotification({
+        userId: patientUserIdToNotify,
+        type: NotificationTypeEnum.APPOINTMENT,
+        title: 'Bác sĩ đang chờ bạn trong phòng khám',
+        content: `Bác sĩ đã vào phòng. Vui lòng tham gia video call cho lịch hẹn ${appointmentNumber}.`,
+        refId: appointmentId,
+        refType: 'APPOINTMENT',
+      });
+    }
+
+    if (doctorUserIdToNotify && appointmentNumber) {
+      void this.notificationService.createNotification({
+        userId: doctorUserIdToNotify,
+        type: NotificationTypeEnum.APPOINTMENT,
+        title: 'Bệnh nhân đang chờ trong phòng khám',
+        content: `Bệnh nhân đã vào phòng. Vui lòng tham gia video call cho lịch hẹn ${appointmentNumber}.`,
+        refId: appointmentId,
+        refType: 'APPOINTMENT',
+      });
+    }
 
     try {
       const tokenData = await this.dailyService.createMeetingToken(
