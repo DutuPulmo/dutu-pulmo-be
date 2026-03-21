@@ -92,16 +92,18 @@ export class AppointmentCheckinService {
       return endOfDayVN(now);
     };
 
-    const lastCheckedInAppointmentInDay =
-      await this.appointmentRepository.findOne({
-        where: {
-          doctorId: appointment.doctorId,
-          status: AppointmentStatusEnum.CHECKED_IN,
-          scheduledAt: Between(startOfToday(), endOfToday()),
-        },
-        order: { checkInTime: 'DESC' },
-      });
-    const queueNumber = lastCheckedInAppointmentInDay?.queueNumber || 0;
+    const maxQueueResult = await this.appointmentRepository
+      .createQueryBuilder('apt')
+      .select('MAX(apt.queueNumber)', 'maxQueue')
+      .where('apt.doctorId = :doctorId', { doctorId: appointment.doctorId })
+      .andWhere('apt.scheduledAt BETWEEN :start AND :end', {
+        start: startOfToday(),
+        end: endOfToday(),
+      })
+      .andWhere('apt.queueNumber IS NOT NULL')
+      .getRawOne<{ maxQueue: string | null }>();
+
+    const queueNumber = Number(maxQueueResult?.maxQueue ?? 0);
 
     await this.appointmentRepository.update(id, {
       status: AppointmentStatusEnum.CHECKED_IN,
