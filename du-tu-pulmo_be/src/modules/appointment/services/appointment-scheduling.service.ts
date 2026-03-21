@@ -69,31 +69,41 @@ export class AppointmentSchedulingService {
         throw new BadRequestException(ERROR_MESSAGES.ALREADY_CANCELLED);
       }
 
-      // ── Kiểm tra trạng thái ──────────────────────────────────────
-      if (appointment.status === AppointmentStatusEnum.IN_PROGRESS) {
-        // Chỉ ADMIN mới được hủy khi đang khám
-        if (cancelledBy !== 'ADMIN') {
+      // ── Kiểm tra trạng thái được phép hủy theo role ─────────────────
+      const PATIENT_CANCELLABLE = [
+        AppointmentStatusEnum.PENDING_PAYMENT,
+        AppointmentStatusEnum.PENDING,
+        AppointmentStatusEnum.CONFIRMED,
+      ];
+      const STAFF_CANCELLABLE = [
+        AppointmentStatusEnum.PENDING_PAYMENT,
+        AppointmentStatusEnum.PENDING,
+        AppointmentStatusEnum.CONFIRMED,
+      ];
+
+      const allowedStatuses =
+        cancelledBy === 'PATIENT' ? PATIENT_CANCELLABLE : STAFF_CANCELLABLE;
+
+      if (!allowedStatuses.includes(appointment.status)) {
+        if (appointment.status === AppointmentStatusEnum.IN_PROGRESS) {
           throw new BadRequestException(
             ERROR_MESSAGES.CANNOT_CANCEL_IN_PROGRESS,
           );
         }
-      }
-
-      if (appointment.status === AppointmentStatusEnum.CHECKED_IN) {
-        // Bệnh nhân không được hủy khi đã check-in
-        if (cancelledBy === 'PATIENT') {
+        if (appointment.status === AppointmentStatusEnum.CHECKED_IN) {
           throw new BadRequestException(
             ERROR_MESSAGES.CANNOT_CANCEL_CHECKED_IN,
           );
         }
+        throw new BadRequestException(ERROR_MESSAGES.CANNOT_CANCEL_COMPLETED);
       }
 
-      // ── Kiểm tra thời gian (chỉ khi CONFIRMED) ───────────────────
+      // ── Kiểm tra thời gian (chỉ khi CONFIRMED — lúc này chỉ STAFF mới tới được đây) ───────────────────
       if (appointment.status === AppointmentStatusEnum.CONFIRMED) {
         const now = new Date();
-        const scheduledTime = new Date(appointment.scheduledAt);
         const minutesUntilStart =
-          (scheduledTime.getTime() - now.getTime()) / (1000 * 60);
+          (new Date(appointment.scheduledAt).getTime() - now.getTime()) /
+          (1000 * 60);
 
         if (cancelledBy === 'PATIENT') {
           if (
@@ -104,7 +114,9 @@ export class AppointmentSchedulingService {
               ERROR_MESSAGES.CANCEL_TOO_LATE_PATIENT,
             );
           }
-        } else if (cancelledBy === 'DOCTOR') {
+        }
+
+        if (cancelledBy === 'DOCTOR') {
           if (
             minutesUntilStart < CANCELLATION_POLICY.DOCTOR_CANCEL_BEFORE_MINUTES
           ) {
@@ -411,6 +423,31 @@ export class AppointmentSchedulingService {
         finalFee === 0
           ? AppointmentStatusEnum.CONFIRMED
           : AppointmentStatusEnum.PENDING_PAYMENT;
+
+      if (appointment.meetingUrl || appointment.dailyCoChannel) {
+        const oldChannel = appointment.dailyCoChannel;
+        appointment.meetingUrl = null;
+        appointment.dailyCoChannel = null;
+        appointment.meetingRoomId = null;
+        appointment.meetingPassword = null;
+        appointment.dailyCoToken = null;
+
+        // Cleanup Daily.co room outside the transaction after saving
+        if (oldChannel) {
+          setImmediate(async () => {
+            try {
+              await this.dailyService.deleteRoom(oldChannel);
+              this.logger.log(
+                `Cleaned up old video room ${oldChannel} after reschedule`,
+              );
+            } catch (err) {
+              this.logger.warn(
+                `Failed to cleanup video room on reschedule: ${err}`,
+              );
+            }
+          });
+        }
+      }
 
       return manager.save(appointment);
     });
