@@ -349,7 +349,6 @@ export class DoctorScheduleRegularService {
     id: string,
     dto: UpdateDoctorScheduleDto,
   ): Promise<ResponseCommon<DoctorSchedule>> {
-    console.log('updateRegular', id, dto.minimumBookingDays);
     const existing = await this.scheduleRepository.findOne({ where: { id } });
     if (!existing) {
       this.logger.error('Schedule not found');

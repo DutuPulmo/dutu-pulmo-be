@@ -125,8 +125,6 @@ export class AppointmentCreateService {
         )
         .getOne();
 
-      console.log(existingAppointment);
-
       if (existingAppointment) {
         this.logger.error(
           'Patient has overlapping appointment conflicting with this time slot',

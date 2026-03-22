@@ -667,6 +667,7 @@ export class AppointmentActionController {
     if (!appt) throw new NotFoundException(ERROR_MESSAGES.RESOURCE_NOT_FOUND);
 
     this.accessService.validateMedicalStatus(appt.status, 'EDIT');
+    this.accessService.checkEditAccess(user, appt);
 
     const response = await this.medicalService.cancelPrescription(
       prescriptionId,

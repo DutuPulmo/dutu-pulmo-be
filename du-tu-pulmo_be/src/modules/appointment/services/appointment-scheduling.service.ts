@@ -59,14 +59,7 @@ export class AppointmentSchedulingService {
         throw new NotFoundException(ERROR_MESSAGES.APPOINTMENT_NOT_FOUND);
       }
 
-      // ── Kiểm tra quá hạn ──────────────────────────────────────────
-      if (new Date(appointment.scheduledAt) < new Date()) {
-        this.logger.error('Cannot cancel expired appointment');
-        throw new BadRequestException(
-          ERROR_MESSAGES.CANNOT_EDIT_EXPIRED_APPOINTMENT,
-        );
-      }
-
+      // 1. Terminal states trước tiên
       if (appointment.status === AppointmentStatusEnum.COMPLETED) {
         this.logger.error('Appointment is completed');
         throw new BadRequestException(ERROR_MESSAGES.CANNOT_CANCEL_COMPLETED);
@@ -75,6 +68,14 @@ export class AppointmentSchedulingService {
       if (appointment.status === AppointmentStatusEnum.CANCELLED) {
         this.logger.error('Appointment is already cancelled');
         throw new BadRequestException(ERROR_MESSAGES.ALREADY_CANCELLED);
+      }
+
+      // 2. Sau đó mới check expired
+      if (new Date(appointment.scheduledAt) < new Date()) {
+        this.logger.error('Cannot cancel expired appointment');
+        throw new BadRequestException(
+          ERROR_MESSAGES.CANNOT_EDIT_EXPIRED_APPOINTMENT,
+        );
       }
 
       // ── Kiểm tra trạng thái được phép hủy theo role ─────────────────

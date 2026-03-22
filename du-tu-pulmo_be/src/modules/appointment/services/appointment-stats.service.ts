@@ -15,6 +15,12 @@ import {
 } from '@/modules/appointment/appointment.constants';
 import { AppointmentMapperService } from '@/modules/appointment/services/appointment-mapper.service';
 
+import {
+  endOfDayVN,
+  startOfDayVN,
+  vnNow,
+} from '@/common/datetime';
+
 @Injectable()
 export class AppointmentStatsService {
   constructor(
@@ -26,14 +32,9 @@ export class AppointmentStatsService {
   async getDoctorQueue(
     doctorId: string,
   ): Promise<ResponseCommon<DoctorQueueDto>> {
-    const now = new Date();
-    const startOfDay = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-    );
-    const endOfDay = new Date(startOfDay);
-    endOfDay.setDate(endOfDay.getDate() + 1);
+    const now = vnNow();
+    const startOfDay = startOfDayVN(now);
+    const endOfDay = endOfDayVN(now);
 
     const appointments = await this.appointmentRepository.find({
       where: {

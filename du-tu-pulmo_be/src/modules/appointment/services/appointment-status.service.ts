@@ -61,6 +61,7 @@ export class AppointmentStatusService {
         AppointmentStatusEnum.CHECKED_IN,
         AppointmentStatusEnum.IN_PROGRESS,
         AppointmentStatusEnum.CANCELLED,
+        AppointmentStatusEnum.NO_SHOW,
       ],
       [AppointmentStatusEnum.CHECKED_IN]: [
         AppointmentStatusEnum.IN_PROGRESS,
@@ -76,6 +77,7 @@ export class AppointmentStatusService {
         AppointmentStatusEnum.CONFIRMED,
         AppointmentStatusEnum.CANCELLED,
       ],
+      [AppointmentStatusEnum.NO_SHOW]: [],
     };
 
     const allowedNextStates = validTransitions[appointment.status] || [];
@@ -105,7 +107,10 @@ export class AppointmentStatusService {
       }
     } else if (status === AppointmentStatusEnum.IN_PROGRESS) {
       updateData.startedAt = new Date();
-    } else if (status === AppointmentStatusEnum.COMPLETED) {
+    } else if (
+      status === AppointmentStatusEnum.COMPLETED ||
+      status === AppointmentStatusEnum.NO_SHOW
+    ) {
       updateData.endedAt = new Date();
 
       if (
@@ -208,6 +213,7 @@ export class AppointmentStatusService {
     const terminalStates = [
       AppointmentStatusEnum.COMPLETED,
       AppointmentStatusEnum.CANCELLED,
+      AppointmentStatusEnum.NO_SHOW,
     ];
 
     if (terminalStates.includes(appointment.status)) {
