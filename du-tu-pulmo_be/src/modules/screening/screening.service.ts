@@ -219,9 +219,28 @@ export class ScreeningService {
     dto: CreateConclusionDto,
   ): Promise<ScreeningConclusion> {
     const screening = await this.findById(screeningId);
-
     const analyses = await this.findAiAnalysesByScreening(screeningId);
-    const latestAnalysis = analyses.length > 0 ? analyses[0] : null;
+    const latestAnalysis = analyses[0] ?? null;
+
+    // ── Business rules ──────────────────────────────────────────
+    // 1. AI_ONLY → bác sĩ không tự đọc, agreesWithAi phải là true
+    let agreesWithAi = dto.agreesWithAi;
+    if (dto.decisionSource === 'AI_ONLY') {
+      agreesWithAi = true;
+    }
+
+    // 2. DOCTOR_ONLY → không so với AI, agreesWithAi không có nghĩa
+    if (dto.decisionSource === 'DOCTOR_ONLY') {
+      agreesWithAi = undefined;
+    }
+
+    // 3. Nếu bác bỏ AI nhưng không có lý do → throw (double-check ngoài class-validator)
+    if (agreesWithAi === false && !dto.doctorOverrideReason?.trim()) {
+      throw new BadRequestException(
+        ERROR_MESSAGES.DOCTOR_OVERRIDE_REASON_REQUIRED,
+      );
+    }
+    // ────────────────────────────────────────────────────────────
 
     const conclusion = this.conclusionRepository.create({
       screeningId,
@@ -229,9 +248,10 @@ export class ScreeningService {
       patientId: screening.patientId,
       doctorId,
       medicalRecordId: screening.medicalRecordId,
-      agreesWithAi: dto.agreesWithAi,
+      agreesWithAi,
       decisionSource: dto.decisionSource,
       doctorOverrideReason: dto.doctorOverrideReason,
+      doctorNotes: dto.doctorNotes,
       reviewedAt: new Date(),
     });
 

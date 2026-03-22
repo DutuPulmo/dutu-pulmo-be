@@ -32,6 +32,9 @@ export class ScreeningConclusionResponseDto {
   @ApiPropertyOptional({ example: 'Override reason' })
   doctorOverrideReason?: string;
 
+  @ApiPropertyOptional({ example: 'Doctor notes' })
+  doctorNotes?: string;
+
   @ApiProperty({ example: '2024-10-11T09:30:00.000Z' })
   reviewedAt: Date;
 
@@ -52,6 +55,7 @@ export class ScreeningConclusionResponseDto {
 
     decisionSource?: DecisionSource | null;
     doctorOverrideReason?: string | null;
+    doctorNotes?: string | null;
 
     reviewedAt: Date;
     createdAt: Date;
@@ -68,6 +72,7 @@ export class ScreeningConclusionResponseDto {
 
     dto.decisionSource = conclusion.decisionSource ?? undefined;
     dto.doctorOverrideReason = conclusion.doctorOverrideReason ?? undefined;
+    dto.doctorNotes = conclusion.doctorNotes ?? undefined;
 
     dto.reviewedAt = conclusion.reviewedAt;
     dto.createdAt = conclusion.createdAt;
