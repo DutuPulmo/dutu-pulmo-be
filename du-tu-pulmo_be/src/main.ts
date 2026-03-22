@@ -176,6 +176,8 @@ async function bootstrap() {
   logger.log(`📚 Swagger API Docs: http://${host}:${port}/docs`);
   logger.log(`📚 Swagger Admin API Docs: http://${host}:${port}/docs/admin`);
   logger.log(`📚 Swagger Doctor API Docs: http://${host}:${port}/docs/doctor`);
-  logger.log(`📚 Swagger Patient API Docs: http://${host}:${port}/docs/patient`);
+  logger.log(
+    `📚 Swagger Patient API Docs: http://${host}:${port}/docs/patient`,
+  );
 }
 void bootstrap();

@@ -1557,8 +1557,7 @@ async function seed() {
 
     await dataSource.destroy();
   } catch (error) {
-    logger.error(
-'❌ Seed Failed:', error);
+    logger.error('❌ Seed Failed:', error);
     if (dataSource.isInitialized) await dataSource.destroy();
     process.exit(1);
   }

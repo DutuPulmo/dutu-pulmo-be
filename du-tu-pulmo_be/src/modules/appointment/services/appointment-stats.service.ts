@@ -15,11 +15,7 @@ import {
 } from '@/modules/appointment/appointment.constants';
 import { AppointmentMapperService } from '@/modules/appointment/services/appointment-mapper.service';
 
-import {
-  endOfDayVN,
-  startOfDayVN,
-  vnNow,
-} from '@/common/datetime';
+import { endOfDayVN, startOfDayVN, vnNow } from '@/common/datetime';
 
 @Injectable()
 export class AppointmentStatsService {
