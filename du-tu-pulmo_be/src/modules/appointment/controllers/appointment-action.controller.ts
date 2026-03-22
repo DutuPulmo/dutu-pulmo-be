@@ -322,6 +322,12 @@ export class AppointmentActionController {
   }
 
   @Put(':id/cancel')
+  @Roles(
+    RoleEnum.ADMIN,
+    RoleEnum.DOCTOR,
+    RoleEnum.PATIENT,
+    RoleEnum.RECEPTIONIST,
+  )
   @ApiOperation({ summary: 'Hủy lịch hẹn' })
   @ApiParam({ name: 'id', description: 'Appointment ID (UUID)' })
   @ApiResponse({ status: HttpStatus.OK, type: AppointmentResponseDto })
@@ -367,6 +373,12 @@ export class AppointmentActionController {
   }
 
   @Put(':id/reschedule')
+  @Roles(
+    RoleEnum.ADMIN,
+    RoleEnum.DOCTOR,
+    RoleEnum.PATIENT,
+    RoleEnum.RECEPTIONIST,
+  )
   @ApiOperation({ summary: 'Đổi lịch hẹn sang time slot khác' })
   @ApiParam({ name: 'id', description: 'Appointment ID (UUID)' })
   @ApiResponse({ status: HttpStatus.OK, type: AppointmentResponseDto })

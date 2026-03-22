@@ -195,7 +195,7 @@ export class DoctorScheduleTimeOffService {
     if (result.cancelledAppointments.length > 0) {
       this.notificationService
         .notifyCancelledAppointments(result.cancelledAppointments, 'TIME_OFF')
-        .catch((err) => console.error('Failed to send notifications:', err));
+        .catch((err) => this.logger.error('Failed to send notifications:', err));
     }
 
     const message =
@@ -464,7 +464,7 @@ export class DoctorScheduleTimeOffService {
     if (result.cancelledAppointments.length > 0) {
       this.notificationService
         .notifyCancelledAppointments(result.cancelledAppointments, 'TIME_OFF')
-        .catch((err) => console.error('Failed to send notifications:', err));
+        .catch((err) => this.logger.error('Failed to send notifications:', err));
     }
 
     let message = `Cập nhật lịch nghỉ thành công.`;

@@ -966,7 +966,7 @@ export class DoctorScheduleRegularService {
           result.cancelledAppointments,
           'SCHEDULE_CHANGE',
         )
-        .catch((err) => console.error('Failed to send notifications:', err));
+        .catch((err) => this.logger.error('Failed to send notifications:', err));
     }
 
     let message = `Cập nhật lịch cố định thành công. Thay đổi áp dụng từ ngày ${tomorrow.toLocaleDateString(
@@ -1108,7 +1108,7 @@ export class DoctorScheduleRegularService {
     if (result.appointmentsList.length > 0) {
       this.notificationService
         .notifyCancelledAppointments(result.appointmentsList, 'SCHEDULE_CHANGE')
-        .catch((err) => console.error('Failed to send notifications:', err));
+        .catch((err) => this.logger.error('Failed to send notifications:', err));
     }
 
     let message = 'Xóa lịch làm việc cố định thành công.';

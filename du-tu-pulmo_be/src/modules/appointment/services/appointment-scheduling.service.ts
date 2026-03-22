@@ -70,6 +70,11 @@ export class AppointmentSchedulingService {
         throw new BadRequestException(ERROR_MESSAGES.ALREADY_CANCELLED);
       }
 
+      if (appointment.status === AppointmentStatusEnum.NO_SHOW) {
+        this.logger.error('Appointment is NO_SHOW');
+        throw new BadRequestException(ERROR_MESSAGES.CANNOT_CANCEL_COMPLETED);
+      }
+
       // 2. Sau đó mới check expired
       if (new Date(appointment.scheduledAt) < new Date()) {
         this.logger.error('Cannot cancel expired appointment');

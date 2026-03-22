@@ -651,7 +651,7 @@ export class DoctorScheduleFlexibleService {
       this.notificationService
         .notifyCancelledAppointments(cancelledAppointments, 'SCHEDULE_CHANGE')
         .catch((err) => {
-          console.error('Failed to send notifications:', err);
+          this.logger.error('Failed to send notifications:', err);
         });
     }
   }
