@@ -515,41 +515,35 @@ export class AppointmentSchedulingService {
 
       const saved = await manager.save(appointment);
 
-      // GIAI ĐOẠN 2 (sau transaction): Cancel gateway async, không block reschedule
-      // Lưu ref để dùng trong setImmediate
-      const paymentsToCancel = [...pendingPayments];
+      return { saved, paymentsToCancel: [...pendingPayments] };
+    });
 
-      setImmediate(() => {
-        void (async () => {
-          for (const payment of paymentsToCancel) {
-            try {
-              await this.payosService.cancelPaymentLink(
-                Number(payment.orderCode),
-                'INVALIDATED_BY_RESCHEDULE',
-              );
+    setImmediate(() => {
+      void (async () => {
+        for (const payment of result.paymentsToCancel) {
+          try {
+            await this.payosService.cancelPaymentLink(
+              Number(payment.orderCode),
+              'INVALIDATED_BY_RESCHEDULE',
+            );
 
-              // Xóa error code khi gateway thành công
-              await this.dataSource.getRepository(Payment).update(payment.id, {
-                errorCode: null,
-                errorMessage: null,
-              });
+            // Xóa error code khi gateway thành công
+            await this.dataSource.getRepository(Payment).update(payment.id, {
+              errorCode: null,
+              errorMessage: null,
+            });
 
-              this.logger.log(
-                `Gateway cancelled payment ${payment.id} for reschedule`,
-              );
-            } catch (error) {
-              // Giữ errorCode = 'PENDING_GATEWAY_CANCEL'
-              // Cron job sẽ query và retry định kỳ
-              this.logger.error(
-                `Failed to cancel payment ${payment.id} on gateway. ` +
-                  `Will be retried by cron. Error: ${error instanceof Error ? error.message : String(error)}`,
-              );
-            }
+            this.logger.log(
+              `Gateway cancelled payment ${payment.id} for reschedule`,
+            );
+          } catch (error) {
+            this.logger.error(
+              `Failed to cancel payment ${payment.id} on gateway. ` +
+                `Will be retried by cron. Error: ${error instanceof Error ? error.message : String(error)}`,
+            );
           }
-        })();
-      });
-
-      return saved;
+        }
+      })();
     });
 
     const apptWithRelations = await this.dataSource
@@ -560,7 +554,7 @@ export class AppointmentSchedulingService {
       });
 
     if (apptWithRelations) {
-      const newDate = result.scheduledAt.toLocaleDateString('vi-VN', {
+      const newDate = result.saved.scheduledAt.toLocaleDateString('vi-VN', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
@@ -593,7 +587,7 @@ export class AppointmentSchedulingService {
     return new ResponseCommon(
       200,
       'Đổi lịch hẹn thành công',
-      this.mapper.toDto(result),
+      this.mapper.toDto(result.saved),
     );
   }
 }

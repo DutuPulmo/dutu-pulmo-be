@@ -73,7 +73,12 @@ export class Payment {
   // ========================================
   // PAYOS PAYMENT LINK INFO
   // ========================================
-  @Column({ name: 'payment_link_id', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'payment_link_id',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   paymentLinkId: string;
 
   @Column({ name: 'checkout_url', type: 'text', nullable: true })
@@ -85,38 +90,83 @@ export class Payment {
   @Column({ name: 'bin', type: 'varchar', length: 20, nullable: true })
   bin: string;
 
-  @Column({ name: 'account_number', type: 'varchar', length: 50, nullable: true })
+  @Column({
+    name: 'account_number',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
   accountNumber: string;
 
-  @Column({ name: 'account_name', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'account_name',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   accountName: string;
 
   // ========================================
   // TRANSACTION INFO
   // ========================================
-  @Column({ name: 'transaction_reference', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'transaction_reference',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   transactionReference: string;
 
   @Column({ name: 'paid_at', type: 'timestamptz', nullable: true })
   paidAt: Date;
 
-  @Column({ name: 'counter_account_bank_id', type: 'varchar', length: 20, nullable: true })
+  @Column({
+    name: 'counter_account_bank_id',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
   counterAccountBankId: string;
 
-  @Column({ name: 'counter_account_bank_name', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'counter_account_bank_name',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   counterAccountBankName: string;
 
-  @Column({ name: 'counter_account_name', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'counter_account_name',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   counterAccountName: string;
 
   // SECURITY: Masked account number instead of raw
-  @Column({ name: 'counter_account_number_masked', type: 'varchar', length: 20, nullable: true })
+  @Column({
+    name: 'counter_account_number_masked',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
   counterAccountNumberMasked: string;
 
-  @Column({ name: 'virtual_account_name', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'virtual_account_name',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   virtualAccountName: string;
 
-  @Column({ name: 'virtual_account_number', type: 'varchar', length: 50, nullable: true })
+  @Column({
+    name: 'virtual_account_number',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
   virtualAccountNumber: string;
 
   // ========================================

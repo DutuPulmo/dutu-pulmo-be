@@ -99,10 +99,14 @@ export class ScreeningService {
       where: { id },
       relations: [
         'patient',
+        'patient.user',
         'uploadedByDoctor',
+        'uploadedByDoctor.user',
         'images',
         'aiAnalyses',
         'conclusions',
+        'conclusions.doctor',
+        'conclusions.doctor.user',
       ],
     });
     if (!screening)
@@ -256,6 +260,7 @@ export class ScreeningService {
     });
 
     const saved = await this.conclusionRepository.save(conclusion);
+    saved.patient = screening.patient;
 
     if (
       screening.status !== ScreeningStatusEnum.DOCTOR_COMPLETED &&
@@ -274,7 +279,7 @@ export class ScreeningService {
     return this.conclusionRepository.find({
       where: { screeningId },
       order: { reviewedAt: 'DESC' },
-      relations: ['doctor'],
+      relations: ['doctor', 'patient', 'patient.user', 'doctor.user'],
     });
   }
 
@@ -322,6 +327,7 @@ export class ScreeningService {
     const qb = this.screeningRepository
       .createQueryBuilder('screening')
       .leftJoinAndSelect('screening.patient', 'patient')
+      .leftJoinAndSelect('patient.user', 'user')
       .leftJoinAndSelect('screening.images', 'images')
       .leftJoinAndSelect('screening.uploadedByDoctor', 'uploadedByDoctor')
       .where('screening.uploadedByDoctorId = :doctorId', { doctorId });
