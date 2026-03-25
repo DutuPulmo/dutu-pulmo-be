@@ -21,6 +21,8 @@ import { ERROR_MESSAGES } from '@/common/constants/error-messages.constant';
 import { NotificationTypeEnum } from '@/modules/common/enums/notification-type.enum';
 import { NotificationService } from '@/modules/notification/notification.service';
 import { MedicalService } from '@/modules/medical/medical.service';
+import { RichTextService } from '@/modules/appointment/services/rich-text.service';
+import { validateTextFieldsPolicy } from '@/common/utils/text-fields-policy.util';
 
 @Injectable()
 export class AppointmentStatusService {
@@ -35,6 +37,7 @@ export class AppointmentStatusService {
     private readonly appointmentEntityService: AppointmentEntityService,
     private readonly notificationService: NotificationService,
     private readonly dataSource: DataSource,
+    private readonly richTextService: RichTextService,
     @Inject(forwardRef(() => MedicalService))
     private readonly medicalService: MedicalService,
   ) {}
@@ -43,7 +46,12 @@ export class AppointmentStatusService {
     id: string,
     status: AppointmentStatusEnum,
   ): Promise<ResponseCommon<AppointmentResponseDto>> {
-    return this.dataSource.transaction(async (manager: EntityManager) => {
+    let createdEncounter: Pick<
+      Awaited<ReturnType<MedicalService['upsertEncounterInTx']>>['record'],
+      'id' | 'patientId' | 'recordNumber'
+    > | null = null;
+
+    await this.dataSource.transaction(async (manager: EntityManager) => {
       const appointment = await manager.findOne(Appointment, {
         where: { id },
         relations: [
@@ -110,7 +118,9 @@ export class AppointmentStatusService {
           !appointment.meetingUrl
         ) {
           try {
-            const room = await this.dailyService.getOrCreateRoom(appointment.id);
+            const room = await this.dailyService.getOrCreateRoom(
+              appointment.id,
+            );
             updateData.meetingUrl = room.url;
             updateData.dailyCoChannel = room.name;
             this.logger.log(
@@ -124,7 +134,13 @@ export class AppointmentStatusService {
       } else if (status === AppointmentStatusEnum.IN_PROGRESS) {
         updateData.startedAt = new Date();
         // Ensure medical record is created
-        await this.medicalService.upsertEncounterInTx(manager, appointment);
+        const encounterResult = await this.medicalService.upsertEncounterInTx(
+          manager,
+          appointment,
+        );
+        if (encounterResult.created) {
+          createdEncounter = encounterResult.record;
+        }
       } else if (
         status === AppointmentStatusEnum.COMPLETED ||
         status === AppointmentStatusEnum.NO_SHOW
@@ -137,7 +153,9 @@ export class AppointmentStatusService {
         ) {
           try {
             await this.dailyService.deleteRoom(appointment.dailyCoChannel);
-            await this.callStateService.clearCallsForAppointment(appointment.id);
+            await this.callStateService.clearCallsForAppointment(
+              appointment.id,
+            );
             this.logger.log(
               `Cleaned up video room for appointment ${appointment.id}`,
             );
@@ -148,8 +166,13 @@ export class AppointmentStatusService {
       }
 
       await manager.update(Appointment, id, updateData);
-      return this.appointmentReadService.findById(id);
     });
+
+    if (createdEncounter) {
+      this.medicalService.logAutoCreatedEncounter(createdEncounter);
+    }
+
+    return this.appointmentReadService.findById(id);
   }
 
   async confirmPayment(
@@ -240,7 +263,28 @@ export class AppointmentStatusService {
       throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
     }
 
-    await this.appointmentRepository.update(appointmentId, data);
+    validateTextFieldsPolicy({
+      chiefComplaint: data.chiefComplaint,
+      chiefComplaintErrorCode:
+        ERROR_MESSAGES.APPOINTMENT_NOTES_CHIEF_COMPLAINT_PLAIN_TEXT_ONLY,
+    });
+
+    const sanitizedData = { ...data };
+
+    if (sanitizedData.patientNotes) {
+      sanitizedData.patientNotes =
+        await this.richTextService.processPatientNotes(
+          sanitizedData.patientNotes,
+        );
+    }
+
+    if (sanitizedData.doctorNotes) {
+      sanitizedData.doctorNotes = await this.richTextService.processDoctorNotes(
+        sanitizedData.doctorNotes,
+      );
+    }
+
+    await this.appointmentRepository.update(appointmentId, sanitizedData);
 
     this.logger.log(`Updated clinical info for appointment ${appointmentId}`);
 

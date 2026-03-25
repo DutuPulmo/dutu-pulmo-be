@@ -71,6 +71,12 @@ export class AppointmentActionController {
   ) {}
 
   @Post()
+  @Roles(
+    RoleEnum.ADMIN,
+    RoleEnum.RECEPTIONIST,
+    RoleEnum.PATIENT,
+    RoleEnum.DOCTOR,
+  )
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Tạo lịch hẹn mới' })
   @ApiResponse({ status: HttpStatus.CREATED, type: AppointmentResponseDto })
@@ -547,14 +553,22 @@ export class AppointmentActionController {
     const appt = await this.appointmentService.findOne(id);
     if (!appt) throw new NotFoundException(ERROR_MESSAGES.RESOURCE_NOT_FOUND);
 
-    const encounterResponse =
-      await this.medicalService.getEncounterByAppointment(id);
-    const encounterRecord = encounterResponse.data;
-    if (!encounterRecord)
-      throw new NotFoundException(ERROR_MESSAGES.RESOURCE_NOT_FOUND);
-
-    this.accessService.validateMedicalRecordStatus(encounterRecord.status, 'EDIT');
     this.accessService.checkEditAccess(user, appt);
+    try {
+      const encounterResponse =
+        await this.medicalService.getEncounterByAppointment(id);
+      const encounterRecord = encounterResponse.data;
+      if (encounterRecord) {
+        this.accessService.validateMedicalRecordStatus(
+          encounterRecord.status,
+          'EDIT',
+        );
+      }
+    } catch (error) {
+      if (!(error instanceof NotFoundException)) {
+        throw error;
+      }
+    }
 
     const response = await this.medicalService.updateEncounterByAppointment(
       id,
