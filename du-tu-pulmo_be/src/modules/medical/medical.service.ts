@@ -985,7 +985,7 @@ export class MedicalService {
       this.auditService.log(auditPayload);
     }
 
-    return new ResponseCommon(HttpStatus.CREATED, 'Ke don thanh cong', result);
+    return new ResponseCommon(HttpStatus.CREATED, 'Kê đơn thành công', result);
   }
 
   async cancelPrescription(
@@ -1667,16 +1667,18 @@ export class MedicalService {
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-    // Attempt 1: Same type + COMPLETED + within 6 months
+    // Attempt 1: Same type + COMPLETED appointment + within 6 months
     if (currentRecordType) {
       const sameTypeCompleted = await this.recordRepository.findOne({
         where: {
           patientId,
           recordType: currentRecordType,
-          status: MedicalRecordStatusEnum.COMPLETED,
+          appointment: {
+            status: AppointmentStatusEnum.COMPLETED,
+          },
           createdAt: MoreThan(sixMonthsAgo),
         },
-        relations: ['doctor', 'doctor.user'],
+        relations: ['doctor', 'doctor.user', 'appointment'],
         order: { createdAt: 'DESC' },
       });
       if (sameTypeCompleted && sameTypeCompleted.id !== currentRecordId) {
@@ -1684,14 +1686,16 @@ export class MedicalService {
       }
     }
 
-    // Attempt 2: Any type + COMPLETED + within 6 months
+    // Attempt 2: Any type + COMPLETED appointment + within 6 months
     const anyCompleted = await this.recordRepository.findOne({
       where: {
         patientId,
-        status: MedicalRecordStatusEnum.COMPLETED,
+        appointment: {
+          status: AppointmentStatusEnum.COMPLETED,
+        },
         createdAt: MoreThan(sixMonthsAgo),
       },
-      relations: ['doctor', 'doctor.user'],
+      relations: ['doctor', 'doctor.user', 'appointment'],
       order: { createdAt: 'DESC' },
     });
 
@@ -1705,7 +1709,7 @@ export class MedicalService {
         patientId,
         createdAt: MoreThan(sixMonthsAgo),
       },
-      relations: ['doctor', 'doctor.user'],
+      relations: ['doctor', 'doctor.user', 'appointment'],
       order: { createdAt: 'DESC' },
     });
 
