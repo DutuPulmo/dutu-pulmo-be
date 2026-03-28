@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, EntityManager, In, DataSource, MoreThan } from 'typeorm';
 import { MedicalRecord } from '@/modules/medical/entities/medical-record.entity';
 import { VitalSign } from '@/modules/medical/entities/vital-sign.entity';
+import { MedicalRecordAddendum } from '@/modules/medical/entities/medical-record-addendum.entity';
 import { Prescription } from '@/modules/medical/entities/prescription.entity';
 import { PrescriptionItem } from '@/modules/medical/entities/prescription-item.entity';
 import { Medicine } from '@/modules/medical/entities/medicine.entity';
@@ -52,6 +53,7 @@ const VALID_TRANSITIONS: Record<
   ],
   [MedicalRecordStatusEnum.IN_PROGRESS]: [MedicalRecordStatusEnum.COMPLETED],
   [MedicalRecordStatusEnum.COMPLETED]: [MedicalRecordStatusEnum.IN_PROGRESS],
+  [MedicalRecordStatusEnum.SUPERSEDED]: [],
 };
 
 const REOPEN_WINDOW_HOURS = 48;
@@ -61,6 +63,8 @@ export class MedicalService {
   constructor(
     @InjectRepository(MedicalRecord)
     private readonly recordRepository: Repository<MedicalRecord>,
+    @InjectRepository(MedicalRecordAddendum)
+    private readonly addendumRepository: Repository<MedicalRecordAddendum>,
     @InjectRepository(VitalSign)
     private readonly vitalSignRepository: Repository<VitalSign>,
     @InjectRepository(Prescription)
@@ -204,6 +208,7 @@ export class MedicalService {
     }
 
     this.assertNotCompleted(record);
+    this.assertNotSigned(record);
 
     if (data.previousRecordId !== undefined) {
       await this.validateLinking(id, record.patientId, data.previousRecordId);
@@ -330,6 +335,14 @@ export class MedicalService {
   private assertNotCompleted(record: MedicalRecord): void {
     if (record.status === MedicalRecordStatusEnum.COMPLETED) {
       throw new BadRequestException(ERROR_MESSAGES.MEDICAL_RECORD_COMPLETED);
+    }
+  }
+
+  private assertNotSigned(record: MedicalRecord): void {
+    if (record.signedStatus === 'SIGNED') {
+      throw new BadRequestException(
+        'Bệnh án đã được ký số, không thể chỉnh sửa. Vui lòng tạo bản đính chính.',
+      );
     }
   }
 
@@ -703,6 +716,7 @@ export class MedicalService {
 
       if (record) {
         this.accessService.validateMedicalRecordStatus(record.status, 'EDIT');
+        this.assertNotSigned(record);
       } else {
         const canCreate = [
           AppointmentStatusEnum.IN_PROGRESS,
@@ -838,6 +852,7 @@ export class MedicalService {
       throw new NotFoundException(ERROR_MESSAGES.MEDICAL_RECORD_NOT_FOUND);
     }
     this.assertNotCompleted(record);
+    this.assertNotSigned(record);
 
     const vitalSign = this.vitalSignRepository.create({
       ...data,
@@ -892,6 +907,7 @@ export class MedicalService {
         throw new NotFoundException(ERROR_MESSAGES.MEDICAL_RECORD_NOT_FOUND);
       }
       this.assertNotCompleted(record);
+      this.assertNotSigned(record);
 
       if (data.diagnosis !== undefined) {
         record.diagnosis = data.diagnosis;
@@ -1388,6 +1404,11 @@ export class MedicalService {
     record.signedStatus = SignedStatusEnum.SIGNED;
     record.signedAt = new Date();
     record.digitalSignature = dto.signature;
+    
+    // Preparation for BoldSign integration
+    if (dto.documentId) {
+      record.boldSignDocumentId = dto.documentId;
+    }
 
     await this.recordRepository.save(record);
 
@@ -1430,6 +1451,51 @@ export class MedicalService {
     }
 
     return this.getMedicalRecordDetail(recordId, user);
+  }
+
+  async createAddendum(
+    recordId: string,
+    dto: { reason: string; content: string },
+    user: JwtUser,
+  ): Promise<ResponseCommon<MedicalRecordAddendum>> {
+    const record = await this.recordRepository.findOne({ where: { id: recordId } });
+    if (!record) {
+      throw new NotFoundException(ERROR_MESSAGES.MEDICAL_RECORD_NOT_FOUND);
+    }
+
+    if (record.signedStatus !== 'SIGNED') {
+      throw new BadRequestException(
+        'Chỉ có thể tạo bản đính chính cho bệnh án đã ký số.',
+      );
+    }
+
+    const addendum = this.addendumRepository.create({
+      originalRecordId: recordId,
+      doctorId: user.doctorId,
+      reason: dto.reason,
+      content: dto.content,
+      signedStatus: 'NOT_SIGNED',
+    });
+
+    const result = await this.addendumRepository.save(addendum);
+
+    const { actorId, actorRole } = this.getAuditActorInfo(user);
+    this.auditService.log({
+      entityType: AuditEntityType.MEDICAL_RECORD,
+      entityId: recordId,
+      medicalRecordId: recordId,
+      patientId: record.patientId,
+      actorId,
+      actorRole,
+      action: AuditAction.UPDATE_RECORD,
+      metadata: { 
+        type: 'ADDENDUM_CREATED',
+        addendumId: result.id,
+        reason: dto.reason 
+      },
+    });
+
+    return new ResponseCommon(HttpStatus.CREATED, 'Tạo bản đính chính thành công', result);
   }
 
   // ============================================================================

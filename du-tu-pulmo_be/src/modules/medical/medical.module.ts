@@ -7,6 +7,7 @@ import { Prescription } from '@/modules/medical/entities/prescription.entity';
 import { PrescriptionItem } from '@/modules/medical/entities/prescription-item.entity';
 import { Medicine } from '@/modules/medical/entities/medicine.entity';
 import { MedicalRecordAuditLog } from '@/modules/medical/entities/medical-record-audit-log.entity';
+import { MedicalRecordAddendum } from '@/modules/medical/entities/medical-record-addendum.entity';
 import { MedicalService } from '@/modules/medical/medical.service';
 import { MedicineService } from '@/modules/medical/medicine.service';
 import { MedicalController } from '@/modules/medical/medical.controller';
@@ -21,6 +22,7 @@ import { MedicalAuditListener } from './medical-audit.listener';
   imports: [
     TypeOrmModule.forFeature([
       MedicalRecord,
+      MedicalRecordAddendum,
       MedicalRecordAuditLog,
       VitalSign,
       Prescription,

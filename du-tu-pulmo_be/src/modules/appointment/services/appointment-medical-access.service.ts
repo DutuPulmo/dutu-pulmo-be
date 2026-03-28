@@ -17,6 +17,7 @@ export class AppointmentMedicalAccessService {
     MedicalRecordStatusEnum.DRAFT,
     MedicalRecordStatusEnum.IN_PROGRESS,
     MedicalRecordStatusEnum.COMPLETED,
+    MedicalRecordStatusEnum.SUPERSEDED,
   ];
 
   private readonly editRecordStatuses = [

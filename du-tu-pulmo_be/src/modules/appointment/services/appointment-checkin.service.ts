@@ -96,12 +96,18 @@ export class AppointmentCheckinService {
           appointmentStatus.appointmentType === AppointmentTypeEnum.IN_CLINIC
         ) {
           if (timeDiffMinutes > 30 || timeDiffMinutes < -15)
-            throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
+            this.logger.error(
+              `Appointment ${id} is not IN_CLINIC type and timeDiffMinutes is ${timeDiffMinutes}`,
+            );
+          throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
         } else if (
           appointmentStatus.appointmentType === AppointmentTypeEnum.VIDEO
         ) {
           if (timeDiffMinutes > 60 || timeDiffMinutes < -30)
-            throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
+            this.logger.error(
+              `Appointment ${id} is not VIDEO type and timeDiffMinutes is ${timeDiffMinutes}`,
+            );
+          throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
         }
 
         const newQueueNumber = await this.getNextQueueNumber(

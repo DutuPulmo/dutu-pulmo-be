@@ -61,6 +61,12 @@ export class MedicalRecord {
   @Column({ name: 'pdf_url', type: 'varchar', nullable: true })
   pdfUrl: string | null;
 
+  @Column({ name: 'bold_sign_document_id', type: 'varchar', nullable: true })
+  boldSignDocumentId: string | null;
+
+  @Column({ name: 'content_hash', type: 'varchar', nullable: true })
+  contentHash: string | null;
+
   // ===== ADMINISTRATIVE FIELDS =====
   @Column({
     name: 'record_type',

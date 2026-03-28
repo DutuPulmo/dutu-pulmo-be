@@ -10,4 +10,14 @@ export class SignMedicalRecordDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ description: 'BoldSign Document ID' })
+  @IsOptional()
+  @IsString()
+  documentId?: string;
+
+  @ApiPropertyOptional({ description: 'SHA-256 Hash của nội dung' })
+  @IsOptional()
+  @IsString()
+  contentHash?: string;
 }

@@ -40,6 +40,7 @@ import { RolesGuard } from '@/modules/core/auth/guards/roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { CurrentUser } from '@/common/decorators/user.decorator';
 import type { JwtUser } from '@/modules/core/auth/strategies/jwt.strategy';
+import { CreateAddendumDto } from '@/modules/medical/dto/create-addendum.dto';
 import { AppointmentService } from '@/modules/appointment/services/appointment.service';
 import { ResponseCommon } from '@/common/dto/response.dto';
 import { RoleEnum } from '@/modules/common/enums/role.enum';
@@ -312,6 +313,22 @@ export class MedicalController {
     @CurrentUser() user: JwtUser,
   ): Promise<ResponseCommon<MedicalRecordDetailResponseDto>> {
     return this.medicalService.signMedicalRecord(id, dto, user);
+  }
+
+  @Post('records/:id/addendum')
+  @Roles(RoleEnum.DOCTOR)
+  @ApiOperation({ summary: 'Tạo bản đính chính cho bệnh án đã ký số' })
+  @ApiParam({ name: 'id', description: 'Medical Record ID (UUID)' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Tạo bản đính chính thành công',
+  })
+  async createAddendum(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateAddendumDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.medicalService.createAddendum(id, dto, user);
   }
 
   @Post('records/:id/complete')
