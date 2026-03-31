@@ -56,7 +56,7 @@ async function bootstrap() {
    */
   const ENV = process.env.ENV || process.env.NODE_ENV || 'development';
 
-  const PUBLIC_URL = process.env.PUBLIC_URL;
+  const PUBLIC_URL = process.env.BACKEND_URL;
 
   let serverUrl: string;
 
