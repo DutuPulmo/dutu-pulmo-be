@@ -91,6 +91,9 @@ export class AppointmentResponseDto {
   checkInTime?: Date;
 
   @ApiPropertyOptional()
+  isLateCheckin?: boolean;
+
+  @ApiPropertyOptional()
   startedAt?: Date;
 
   @ApiPropertyOptional()
@@ -156,6 +159,7 @@ export class AppointmentResponseDto {
     dto.patientNotes = entity.patientNotes || undefined;
     dto.doctorNotes = entity.doctorNotes || undefined;
     dto.checkInTime = entity.checkInTime || undefined;
+    dto.isLateCheckin = entity.isLateCheckin ?? false;
     dto.startedAt = entity.startedAt || undefined;
     dto.endedAt = entity.endedAt || undefined;
     dto.cancelledAt = entity.cancelledAt || undefined;

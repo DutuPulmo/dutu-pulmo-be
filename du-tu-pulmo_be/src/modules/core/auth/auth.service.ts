@@ -1043,10 +1043,10 @@ export class AuthService {
   }
 
   /**
-   * OTP valid for 10 minutes
+   * OTP valid for 5 minutes
    */
   private getOtpExpiry(): Date {
-    return new Date(Date.now() + 10 * 60 * 1000);
+    return new Date(Date.now() + 5 * 60 * 1000);
   }
 
   /**
@@ -1217,24 +1217,6 @@ export class AuthService {
             return new ResponseCommon(200, 'SUCCESS', {
               message: 'Email not found',
             });
-          }
-
-          // Rate limiting: Check if OTP was sent recently (within 1 minute)
-          if (account.resetPasswordOtpExpiry) {
-            const now = new Date();
-            const timeSinceLastOtp =
-              now.getTime() - account.resetPasswordOtpExpiry.getTime();
-            const nineMinutes = 9 * 60 * 1000; // 9 phút
-
-            // Nếu OTP cũ còn hơn 1 phút (tức mới gửi trong vòng 1 phút)
-            if (timeSinceLastOtp < nineMinutes) {
-              this.logger.warn(
-                `Rate limit: Reset password OTP already sent recently for ${normalizedEmail}`,
-              );
-              return new ResponseCommon(200, 'SUCCESS', {
-                message: 'Rate limited',
-              });
-            }
           }
 
           // Generate new OTP

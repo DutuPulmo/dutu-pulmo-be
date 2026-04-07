@@ -261,6 +261,9 @@ export class Appointment {
   @Column({ name: 'check_in_time', type: 'timestamptz', nullable: true })
   checkInTime: Date;
 
+  @Column({ name: 'is_late_checkin', default: false })
+  isLateCheckin: boolean;
+
   @Column({ name: 'started_at', type: 'timestamptz', nullable: true })
   startedAt: Date;
 

@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Between, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Appointment } from '@/modules/appointment/entities/appointment.entity';
 import { AppointmentStatusEnum } from '@/modules/common/enums/appointment-status.enum';
 import { AppointmentTypeEnum } from '@/modules/common/enums/appointment-type.enum';
@@ -24,6 +24,7 @@ import { MedicalRecordStatusEnum } from '@/modules/common/enums/medical-record-s
 import { NotificationTypeEnum } from '@/modules/common/enums/notification-type.enum';
 import { NotificationService } from '@/modules/notification/notification.service';
 import { PdfService } from '@/modules/pdf/pdf.service';
+import { CHECKIN_TIME_THRESHOLDS } from '@/modules/appointment/appointment.constants';
 
 @Injectable()
 export class AppointmentCheckinService {
@@ -46,6 +47,7 @@ export class AppointmentCheckinService {
     manager: EntityManager,
     doctorId: string,
     scheduledAt: Date,
+    isLate: boolean = false,
   ): Promise<number> {
     const dayStart = startOfDayVN(scheduledAt);
     const dayEnd = endOfDayVN(scheduledAt);
@@ -55,7 +57,7 @@ export class AppointmentCheckinService {
       queueLockKey,
     ]);
 
-    const maxQueueResult = await manager
+    const baseQuery = manager
       .createQueryBuilder(Appointment, 'apt')
       .select('MAX(apt.queueNumber)', 'maxQueue')
       .where('apt.doctorId = :doctorId', { doctorId })
@@ -63,14 +65,31 @@ export class AppointmentCheckinService {
         start: dayStart,
         end: dayEnd,
       })
-      .andWhere('apt.queueNumber IS NOT NULL')
-      .getRawOne<{ maxQueue: string | null }>();
+      .andWhere('apt.queueNumber IS NOT NULL');
 
-    return Number(maxQueueResult?.maxQueue ?? 0) + 1;
+    if (isLate) {
+      const lateResult = await baseQuery
+        .clone()
+        .andWhere('apt.status IN (:...statuses)', {
+          statuses: [
+            AppointmentStatusEnum.CHECKED_IN,
+            AppointmentStatusEnum.IN_PROGRESS,
+          ],
+        })
+        .getRawOne<{ maxQueue: string | null }>();
+
+      if (lateResult?.maxQueue != null) {
+        return Number(lateResult.maxQueue) + 1;
+      }
+      // Fallback: tái dùng baseQuery
+    }
+
+    const result = await baseQuery.getRawOne<{ maxQueue: string | null }>();
+    return Number(result?.maxQueue ?? 0) + 1;
   }
 
   async checkIn(id: string): Promise<ResponseCommon<AppointmentResponseDto>> {
-    const { queueNumber, doctorId, appointmentType } =
+    const { queueNumber, doctorId, appointmentType, isLateCheckin } =
       await this.dataSource.transaction(async (manager) => {
         // Lock appointment row trước
         const appointmentStatus = await manager.findOne(Appointment, {
@@ -92,19 +111,36 @@ export class AppointmentCheckinService {
           (new Date(appointmentStatus.scheduledAt).getTime() - now.getTime()) /
           (1000 * 60);
 
+        let isLateCheckin = false;
+        const dayEnd = endOfDayVN(appointmentStatus.scheduledAt);
+        if (now > dayEnd) {
+          this.logger.error(`Appointment ${id} checked in after end of day.`);
+          throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
+        }
+
         if (
           appointmentStatus.appointmentType === AppointmentTypeEnum.IN_CLINIC
         ) {
-          if (timeDiffMinutes > 30 || timeDiffMinutes < -15) {
+          if (
+            timeDiffMinutes > CHECKIN_TIME_THRESHOLDS.IN_CLINIC.EARLY_MINUTES
+          ) {
             this.logger.error(
               `Appointment ${id} (IN_CLINIC) timeDiffMinutes is ${timeDiffMinutes}`,
             );
             throw new BadRequestException(ERROR_MESSAGES.INVALID_REQUEST);
           }
+          if (
+            timeDiffMinutes < -CHECKIN_TIME_THRESHOLDS.IN_CLINIC.LATE_MINUTES
+          ) {
+            isLateCheckin = true;
+          }
         } else if (
           appointmentStatus.appointmentType === AppointmentTypeEnum.VIDEO
         ) {
-          if (timeDiffMinutes > 60 || timeDiffMinutes < -30) {
+          if (
+            timeDiffMinutes > CHECKIN_TIME_THRESHOLDS.VIDEO.EARLY_MINUTES ||
+            timeDiffMinutes < -CHECKIN_TIME_THRESHOLDS.VIDEO.LATE_MINUTES
+          ) {
             this.logger.error(
               `Appointment ${id} (VIDEO) timeDiffMinutes is ${timeDiffMinutes}`,
             );
@@ -116,17 +152,20 @@ export class AppointmentCheckinService {
           manager,
           appointmentStatus.doctorId,
           appointmentStatus.scheduledAt,
+          isLateCheckin,
         );
 
         appointmentStatus.status = AppointmentStatusEnum.CHECKED_IN;
         appointmentStatus.checkInTime = new Date();
         appointmentStatus.queueNumber = newQueueNumber;
+        appointmentStatus.isLateCheckin = isLateCheckin;
         await manager.save(appointmentStatus);
 
         return {
           queueNumber: newQueueNumber,
           doctorId: appointmentStatus.doctorId,
           appointmentType: appointmentStatus.appointmentType,
+          isLateCheckin,
         };
       });
 
@@ -141,7 +180,21 @@ export class AppointmentCheckinService {
         userId: data.patient.user.id,
         type: NotificationTypeEnum.APPOINTMENT,
         title: 'Check-in thành công',
-        content: `Bạn đã check-in lịch hẹn ${data.appointmentNumber}. Số thứ tự của bạn là: ${queueNumber}. Vui lòng chờ bác sĩ gọi tên.`,
+        content: isLateCheckin
+          ? `Bạn đã check-in trễ lịch hẹn ${data.appointmentNumber}. Bạn được xếp cuối hàng chờ, số thứ tự: ${queueNumber}.`
+          : `Bạn đã check-in lịch hẹn ${data.appointmentNumber}. Số thứ tự của bạn là: ${queueNumber}. Vui lòng chờ bác sĩ gọi tên.`,
+        refId: id,
+        refType: 'APPOINTMENT',
+      });
+    }
+
+    // Notify doctor if late
+    if (isLateCheckin && data.doctor?.userId) {
+      void this.notificationService.createNotification({
+        userId: data.doctor.userId,
+        type: NotificationTypeEnum.APPOINTMENT,
+        title: 'Bệnh nhân đến trễ',
+        content: `Bệnh nhân ${data.patient?.user?.fullName || 'ẩn danh'} (Lịch hẹn ${data.appointmentNumber}) đã đến trễ và được xếp vào cuối hàng chờ. Số thứ tự: ${queueNumber}.`,
         refId: id,
         refType: 'APPOINTMENT',
       });
