@@ -63,6 +63,7 @@ export class DoctorScheduleTimeOffService {
     >
   > {
     const specificDate = new Date(dto.specificDate);
+    console.log('specificDate', specificDate);
     const priority = SCHEDULE_TYPE_PRIORITY[ScheduleType.TIME_OFF];
 
     if (dto.startTime >= dto.endTime) {
