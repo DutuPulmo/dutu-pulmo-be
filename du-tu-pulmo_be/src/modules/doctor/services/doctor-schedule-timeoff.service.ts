@@ -32,7 +32,13 @@ import { DoctorScheduleHelperService } from '@/modules/doctor/services/doctor-sc
 import { DoctorScheduleQueryService } from '@/modules/doctor/services/doctor-schedule-query.service';
 import { DoctorScheduleUpdateService } from '@/modules/doctor/services/doctor-schedule-update.service';
 import { DoctorScheduleRestoreService } from '@/modules/doctor/services/doctor-schedule-restore.service';
-import { endOfDayVN, getDayVN, startOfDayVN, vnNow } from '@/common/datetime';
+import {
+  endOfDayVN,
+  formatDateVN,
+  getDayVN,
+  startOfDayVN,
+  vnNow,
+} from '@/common/datetime';
 
 @Injectable()
 export class DoctorScheduleTimeOffService {
@@ -175,7 +181,7 @@ export class DoctorScheduleTimeOffService {
         scheduleType: ScheduleType.TIME_OFF,
         priority,
         dayOfWeek,
-        specificDate: specificDateNormalized,
+        specificDate: formatDateVN(specificDateNormalized),
         startTime: dto.startTime,
         endTime: dto.endTime,
         slotCapacity: 1,
@@ -183,8 +189,8 @@ export class DoctorScheduleTimeOffService {
         appointmentType: AppointmentTypeEnum.VIDEO,
         isAvailable: false,
         note: dto.note ?? null,
-        effectiveFrom: specificDateNormalized,
-        effectiveUntil: specificDateNormalized,
+        effectiveFrom: formatDateVN(specificDateNormalized),
+        effectiveUntil: formatDateVN(specificDateNormalized),
       });
 
       const savedSchedule = await manager.save(schedule);

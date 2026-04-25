@@ -198,7 +198,7 @@ export class DoctorScheduleFlexibleService {
         scheduleType: ScheduleType.FLEXIBLE,
         priority,
         dayOfWeek,
-        specificDate: specificDateNormalized,
+        specificDate: formatDateVN(specificDateNormalized),
         startTime: dto.startTime,
         endTime: dto.endTime,
         slotCapacity: dto.slotCapacity,
@@ -209,8 +209,8 @@ export class DoctorScheduleFlexibleService {
         consultationFee: dto.consultationFee?.toString() ?? null,
         discountPercent: dto.discountPercent ?? 0,
         isAvailable: dto.isAvailable ?? true,
-        effectiveFrom: specificDateNormalized,
-        effectiveUntil: specificDateNormalized,
+        effectiveFrom: formatDateVN(specificDateNormalized),
+        effectiveUntil: formatDateVN(specificDateNormalized),
       });
 
       const savedSchedule = await manager.save(schedule);
