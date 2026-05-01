@@ -10,10 +10,10 @@
       "type": "@n8n/n8n-nodes-langchain.chatTrigger",
       "typeVersion": 1.4,
       "position": [
-        -5904,
-        512
+        -2624,
+        16
       ],
-      "id": "3fdb1777-f0cd-4454-a4e7-1e591126a9d3",
+      "id": "618cbf03-c2cf-44e4-8e46-bffcb8d96c90",
       "name": "When chat message received",
       "webhookId": "50582a52-9b8c-4406-9796-955a1208e794"
     },
@@ -37,12 +37,12 @@
           }
         }
       },
-      "id": "c00d162a-3dd3-4c37-be24-096c54835e40",
+      "id": "c2303b69-5f6d-4eee-8fc0-41ce85655520",
       "name": "Webhook (API)",
       "type": "n8n-nodes-base.webhook",
       "position": [
-        -5904,
-        688
+        -2624,
+        192
       ],
       "webhookId": "72d0ce17-8cc0-4939-b6e3-2689ddd093bd",
       "typeVersion": 1.1
@@ -51,12 +51,12 @@
       "parameters": {
         "jsCode": "const items = $input.all();\n\nfor (const item of items) {\n  const rawInput = item.json.chatInput || item.json.body?.message || item.json.body?.query || '';\n  const sessionId = item.json.sessionId || item.json.body?.sessionId || `session-${Date.now()}`;\n\n  item.json = {\n    chatInput: rawInput,\n    sessionId: sessionId,\n    source: item.json.chatInput ? 'chat' : 'api',\n    receivedAt: new Date().toISOString()\n  };\n}\n\nreturn items;"
       },
-      "id": "23d0563e-e387-44d3-bd7b-8bf16c5b1b99",
+      "id": "3a5fe489-5fcc-4d58-80ea-3d2a5f9cad73",
       "name": "Normalize Input",
       "type": "n8n-nodes-base.code",
       "position": [
-        -5648,
-        608
+        -2368,
+        112
       ],
       "typeVersion": 2
     },
@@ -68,12 +68,12 @@
           "systemMessage": "Bạn là trợ lý AI chuyên về Sức khỏe Hô hấp và Phổi học.\n\nQUY TẮC TUYỆT ĐỐI:\n- CHỈ xuất ra câu trả lời cuối cùng. KHÔNG viết suy nghĩ, phân tích, lý luận nội tâm.\n- KHÔNG dùng: \"Okay\", \"Let me\", \"Looking at\", \"I need\", \"Now I\", \"First\", \"The context\", \"Wait\", \"Check\", \"So I\", \"Let's\", \"Based on\", \"The user\", \"According\", \"Then\", \"Make sure\", \"structure it\"\n- TOÀN BỘ output phải bằng tiếng Việt. Tuyệt đối không dùng tiếng Anh.\n\nBƯỚC 1 — TRA CỨU:\nGọi tool `Respiratory_Knowledge_Base` đúng một lần với câu hỏi của người dùng. Không gọi lại.\n\nBƯỚC 2 — TỔNG HỢP TRIỆU CHỨNG:\nXem lại toàn bộ lịch sử hội thoại. Kết hợp tất cả triệu chứng người dùng đã đề cập để đánh giá mức độ nguy hiểm.\nVí dụ: Lượt trước \"sốt 38.5°C\" + lượt này \"đau ngực\" → cảnh báo nguy cơ viêm phổi, khuyên khám ngay.\n\nBƯỚC 3 — TRẢ LỜI NGAY với format sau, KHÔNG có dòng nào khác ngoài format:\n\n[Nếu nguy hiểm: 🚨 CẢNH BÁO: [lý do]. Vui lòng gọi 115 hoặc đến cơ sở y tế ngay.]\n📌 Nguyên nhân phổ biến: [nội dung thực từ KB]\n💊 Triệu chứng có thể gặp: [nội dung thực từ KB]\n⚠️ Dấu hiệu cần lưu ý: [nội dung thực từ KB]\n🛡️ Lời khuyên chung: [nội dung thực từ KB]\n\n[câu hỏi follow-up tiếng Việt]\nTôi là trợ lý AI. Để được tư vấn chuyên môn, vui lòng liên hệ với bác sĩ.\n\nQUY TẮC Y TẾ:\n- KHÔNG chẩn đoán bệnh cụ thể, KHÔNG kê đơn thuốc\n- Khẩn cấp (khó thở nặng, môi tím, ho ra máu, đau ngực dữ dội) → thêm 🚨 CẢNH BÁO và gọi 115\n👨‍⚕️ Khi hỏi đặt lịch: \"Để đặt lịch khám, vui lòng liên hệ bác sĩ chuyên khoa Hô Hấp qua Zalo/Hotline: [Số điện thoại]\"\n"
         }
       },
-      "id": "b918b7bf-7fde-446e-adf0-8b156173efd1",
+      "id": "4ebc29f3-9814-4c96-ab5f-f9d203b0ae33",
       "name": "AI Agent (RAG)",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "position": [
-        -5168,
-        624
+        -1888,
+        128
       ],
       "typeVersion": 1.9
     },
@@ -82,12 +82,12 @@
         "sessionIdType": "customKey",
         "sessionKey": "={{ $json.sessionId }}"
       },
-      "id": "bd5b3b1d-c703-4211-83dc-009d0c79aada",
+      "id": "cc7628dc-7ae6-4855-b13b-da01865821ab",
       "name": "Conversation Memory",
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
       "position": [
-        -5072,
-        912
+        -1792,
+        416
       ],
       "typeVersion": 1.3
     },
@@ -97,12 +97,12 @@
         "description": "Công cụ tra cứu thông tin sức khỏe hô hấp. Gọi tool này MỘT LẦN DUY NHẤT với câu hỏi của người dùng trước khi trả lời. Sau khi nhận kết quả, tổng hợp và trả lời ngay, không gọi lại.",
         "topK": 10
       },
-      "id": "11319cc6-fbd3-4b91-8602-9d2670fda1c5",
+      "id": "a97dfc70-39af-4085-b3e2-92b585b90fd3",
       "name": "Knowledge Base Tool",
       "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
       "position": [
-        -4944,
-        976
+        -1664,
+        480
       ],
       "typeVersion": 1
     },
@@ -116,17 +116,17 @@
         },
         "options": {}
       },
-      "id": "b797a0e4-a770-41cf-9ef0-f2f9ef4e026b",
+      "id": "a8ebb216-db7e-426a-b149-dc5ac6d04260",
       "name": "Pinecone Vector Store",
       "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
       "position": [
-        -5072,
-        1136
+        -1792,
+        640
       ],
       "typeVersion": 1.1,
       "credentials": {
         "pineconeApi": {
-          "id": "Q66qviX7pKvEE4Ri",
+          "id": "onOtlks4xq5c4vrl",
           "name": "PineconeApi account"
         }
       }
@@ -155,12 +155,12 @@
         },
         "options": {}
       },
-      "id": "5710f6ea-c18d-4d43-869e-68f728e8f6c7",
+      "id": "0ed4f688-e568-4861-ae9c-01d81cddb207",
       "name": "Check AI Success",
       "type": "n8n-nodes-base.if",
       "position": [
-        -4864,
-        752
+        -1584,
+        256
       ],
       "typeVersion": 2
     },
@@ -184,12 +184,12 @@
         },
         "options": {}
       },
-      "id": "4509dacb-fe8a-4bb9-8b57-d27bd3b9b37f",
+      "id": "9be14b61-fc6f-45cc-9419-5c70978278c1",
       "name": "Format Success Response",
       "type": "n8n-nodes-base.set",
       "position": [
-        -4432,
-        624
+        -1152,
+        128
       ],
       "typeVersion": 3.4
     },
@@ -219,12 +219,12 @@
         },
         "options": {}
       },
-      "id": "2ac9688e-2dba-43bd-a3d0-654dd507d187",
+      "id": "fdb1882b-3c05-4659-b23e-2a363747f5ac",
       "name": "Format Error Response",
       "type": "n8n-nodes-base.set",
       "position": [
-        -4672,
-        848
+        -1392,
+        352
       ],
       "typeVersion": 3.4
     },
@@ -232,12 +232,12 @@
       "parameters": {
         "jsCode": "const item = $input.first();\nconst data = item?.json || {};\n\nlet sessionId = data.sessionId;\ntry {\n  if (!sessionId) sessionId = $('Normalize Input').item.json.sessionId;\n} catch (e) {}\n\nlet response = data.response || 'Xin lỗi, tôi không hiểu câu hỏi của bạn.';\n\n// === LỌC THINKING LEAK ===\n// Tách thành các dòng để xử lý\nlet lines = response.split('\\n');\nlet cleanLines = [];\nlet foundRealContent = false;\n\n// Pattern nhận ra dòng thinking (tiếng Anh hoặc placeholder)\nconst isThinkingLine = (line) => {\n  const t = line.trim();\n  if (t === '') return false;\n  // Dòng tiếng Anh thinking\n  if (/^(Okay|Let me|Now|Looking|I need|I will|First,|The context|Wait,|Check|So I|Let's|Based on|The user|According|I called|I have|I should|I'll|The tool|I got|Now I|This is|Alright|Sure|Make sure|Then a|Then the|structure it|Let me structure)/i.test(t)) return true;\n  // Dòng placeholder [from data] / [từ context] chưa được điền\n  if (/\\[from data\\]|\\[từ context\\]|\\[nội dung\\]|\\[information\\]/i.test(t)) return true;\n  // Dòng tiếng Anh thuần (chứa nhiều từ tiếng Anh liên tiếp)\n  if (/^[a-zA-Z\\s,.\\-:]+$/.test(t) && t.length > 15) return true;\n  return false;\n};\n\n// Tìm dòng thực sự đầu tiên (có nội dung tiếng Việt hoặc emoji thực)\nfor (let i = 0; i < lines.length; i++) {\n  const t = lines[i].trim();\n  if (!foundRealContent) {\n    if (isThinkingLine(t)) continue;\n    // Dòng bắt đầu bằng emoji VÀ có nội dung thực (không phải placeholder)\n    const hasRealEmoji = /^[📌💊⚠️🛡️🚨]/.test(t) && !/\\[from data\\]|\\[từ context\\]/.test(t);\n    const hasVietnamese = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(t);\n    if (hasRealEmoji || hasVietnamese || t.startsWith('🚨')) {\n      foundRealContent = true;\n      cleanLines.push(lines[i]);\n    }\n  } else {\n    cleanLines.push(lines[i]);\n  }\n}\n\nresponse = cleanLines.join('\\n').trim();\n\n// Fallback nếu filter quá mạnh\nif (response.length < 20) {\n  response = data.response || 'Xin lỗi, tôi không hiểu câu hỏi của bạn.';\n}\n\n// Auto-detect emergency\nconst isEmergency = /🚨|gọi 115|cấp cứu ngay|đến bệnh viện ngay/i.test(response);\nconst severity = isEmergency ? 'emergency' : (data.severity || 'normal');\nconst responseType = isEmergency ? 'emergency' : (data.responseType || 'general');\n\nconst finalResponse = {\n  success: true,\n  data: {\n    message: response,\n    type: responseType,\n    severity,\n    timestamp: new Date().toISOString(),\n    disclaimer: isEmergency ? null : '💙 Thông tin này chỉ mang tính tham khảo. Vui lòng tham khảo bác sĩ để được tư vấn chính xác.',\n    suggestedActions: isEmergency\n      ? ['🚨 Gọi cấp cứu 115 ngay lập tức', 'Đến bệnh viện/phòng cấp cứu gần nhất', 'Giữ bình tĩnh và ngồi thẳng']\n      : ['Theo dõi triệu chứng trong vài ngày', 'Gặp bác sĩ nếu không thuyên giảm', 'Giữ vệ sinh và nghỉ ngơi đầy đủ']\n  },\n  meta: {\n    sessionId: sessionId || 'unknown',\n    queryType: responseType,\n    processedAt: new Date().toISOString()\n  }\n};\n\nreturn [{ json: finalResponse }];"
       },
-      "id": "777ccf90-4b34-4197-9592-6625dcef4c4a",
+      "id": "a9c6b0a7-2a0e-46a0-ae98-fee11ecf2793",
       "name": "Compile Final Response",
       "type": "n8n-nodes-base.code",
       "position": [
-        -3536,
-        672
+        -256,
+        176
       ],
       "typeVersion": 2
     },
@@ -265,12 +265,12 @@
           }
         }
       },
-      "id": "f72a491a-7dd6-48c8-94d3-18529d4ca4f4",
+      "id": "c94df7c9-1748-45fb-bb40-a52339102b64",
       "name": "Send Response",
       "type": "n8n-nodes-base.respondToWebhook",
       "position": [
-        -3280,
-        496
+        0,
+        0
       ],
       "typeVersion": 1.1
     },
@@ -284,14 +284,14 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
       "typeVersion": 1,
       "position": [
-        -5296,
-        832
+        -2016,
+        336
       ],
-      "id": "a314590e-edf1-4e98-b2b8-76a1ee3dbc87",
+      "id": "34e65f6f-81a3-462f-ae74-5c56ac15bd4f",
       "name": "Ollama Chat Model",
       "credentials": {
         "ollamaApi": {
-          "id": "bJWnTloKMaeeaMZz",
+          "id": "dUIkxwtyENjXCKLt",
           "name": "Ollama account"
         }
       }
@@ -306,14 +306,14 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
       "typeVersion": 1,
       "position": [
-        -4720,
-        1168
+        -1440,
+        672
       ],
-      "id": "589da5cf-6e35-4f17-89f9-95e895c48c6a",
+      "id": "211227e0-c620-44ae-a750-e641cad90e7e",
       "name": "Ollama Chat Model1",
       "credentials": {
         "ollamaApi": {
-          "id": "bJWnTloKMaeeaMZz",
+          "id": "dUIkxwtyENjXCKLt",
           "name": "Ollama account"
         }
       }
@@ -328,15 +328,15 @@
       "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
       "typeVersion": 1.2,
       "position": [
-        -5088,
-        1296
+        -1808,
+        800
       ],
-      "id": "23c04d9a-e303-47a3-aabf-ecf7dd4f6d4e",
+      "id": "b1dcbaa1-2524-4fa0-93fe-2887dd83ff4d",
       "name": "Embeddings OpenAI",
       "credentials": {
         "openAiApi": {
-          "id": "51tVrQylRLF8HAKL",
-          "name": "test"
+          "id": "U855x9BND3nmgXvK",
+          "name": "Openrouter"
         }
       }
     }
@@ -505,33 +505,34 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": false
+    "binaryMode": "separate"
   },
-  "versionId": "61669184-5518-41ec-8f82-82b4d98f79b6",
+  "versionId": "d6cf35a6-c4f9-48d3-a9dc-1fe229a93f97",
   "meta": {
-    "instanceId": "f19ed9fad5d3fc6c406211e4d1a49eaa90748654f86be14a397378264213be4d"
+    "templateCredsSetupCompleted": true,
+    "instanceId": "26c301aca3d4cd9c0e95ec6b63c272c94d533b8ac9788d699005f0982b7b8467"
   },
-  "id": "qTR6MxNW_pWk6v8u-U-EY",
+  "id": "yEUfHtJY105WywUA",
   "tags": [
     {
-      "updatedAt": "2026-01-12T14:17:55.617Z",
-      "createdAt": "2026-01-12T14:17:55.617Z",
-      "id": "22Hbd2fjgimf3vZz",
+      "updatedAt": "2026-03-17T14:01:48.435Z",
+      "createdAt": "2026-03-17T14:01:48.435Z",
+      "id": "GjCBQprKUkGBFAKe",
       "name": "Health Assistant"
     },
     {
-      "updatedAt": "2026-01-12T14:17:55.633Z",
-      "createdAt": "2026-01-12T14:17:55.633Z",
-      "id": "7vhAF0zNnk9CcjIM",
+      "updatedAt": "2026-03-17T14:01:48.465Z",
+      "createdAt": "2026-03-17T14:01:48.465Z",
+      "id": "m2Yyn0TTtY5vf3ed",
       "name": "RAG Chatbot"
     },
     {
-      "updatedAt": "2026-01-12T14:17:55.626Z",
-      "createdAt": "2026-01-12T14:17:55.626Z",
-      "id": "fxaZ5XimHLnv1Jmw",
+      "updatedAt": "2026-03-17T14:01:48.466Z",
+      "createdAt": "2026-03-17T14:01:48.466Z",
+      "id": "kZoZKTUTftOQICR7",
       "name": "Respiratory"
     }
   ]
