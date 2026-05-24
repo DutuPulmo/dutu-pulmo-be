@@ -10,7 +10,8 @@ import { HttpAdapterHost } from '@nestjs/core';
 import { AllExceptionsFilter } from '@/common/filters/all-exceptions.filter';
 import * as express from 'express';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -27,7 +28,9 @@ function getRolesFromOperation(operation: unknown): string[] | undefined {
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  app.useStaticAssets(join(process.cwd(), 'public'));
 
   // Body limit
   app.use(express.json({ limit: '20mb' }));
