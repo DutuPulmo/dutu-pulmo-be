@@ -206,7 +206,7 @@ export class AppointmentSchedulingService {
       .getRepository(Appointment)
       .findOne({
         where: { id },
-        relations: ['patient', 'patient.user', 'doctor', 'doctor.user'],
+        relations: ['patient', 'patient.user', 'patient.user.account', 'doctor', 'doctor.user'],
       });
 
     if (apptWithRelations) {
@@ -217,12 +217,18 @@ export class AppointmentSchedulingService {
             ? 'Bệnh nhân'
             : 'Hệ thống';
 
+      const paidAmount = Number(apptWithRelations.paidAmount || 0);
+      const refundNotice =
+        paidAmount > 0
+          ? ' Số tiền bạn đã thanh toán sẽ được hoàn trả vào tài khoản trong vòng 3-5 ngày làm việc.'
+          : '';
+
       if (apptWithRelations.patient?.user?.id) {
         void this.notificationService.createNotification({
           userId: apptWithRelations.patient.user.id,
           type: NotificationTypeEnum.APPOINTMENT,
           title: 'Lịch hẹn đã bị hủy',
-          content: `Lịch hẹn ${result.saved.appointmentNumber} đã bị hủy bởi ${cancellerName}. Lý do: ${reason}.`,
+          content: `Lịch hẹn ${result.saved.appointmentNumber} đã bị hủy bởi ${cancellerName}. Lý do: ${reason}.${refundNotice}`,
           refId: id,
           refType: 'APPOINTMENT',
         });
@@ -238,6 +244,13 @@ export class AppointmentSchedulingService {
           refType: 'APPOINTMENT',
         });
       }
+
+      // Gửi email xác nhận hủy và cam kết hoàn tiền (nếu có)
+      void this.notificationService.sendManualCancellationEmail(
+        apptWithRelations,
+        cancelledBy,
+        reason,
+      );
     }
 
     return new ResponseCommon(

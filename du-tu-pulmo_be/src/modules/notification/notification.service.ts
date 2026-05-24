@@ -234,6 +234,198 @@ export class NotificationService {
   }
 
   /**
+   * Gửi email xác nhận hủy lịch thủ công (cá nhân hóa kèm thông tin hoàn tiền)
+   */
+  async sendManualCancellationEmail(
+    appointment: Appointment,
+    cancelledBy: string,
+    reason: string,
+  ): Promise<void> {
+    try {
+      const patientEmail = appointment.patient?.user?.account?.email;
+      const patientName = appointment.patient?.user?.fullName || 'Quý khách';
+      const doctorName = appointment.doctor?.user?.fullName || 'Bác sĩ';
+
+      if (!patientEmail) {
+        this.logger.warn(
+          `Cannot send manual cancellation email - no email for appointment ${appointment.id}`,
+        );
+        return;
+      }
+
+      const cancellerName =
+        cancelledBy === 'DOCTOR'
+          ? 'Bác sĩ'
+          : cancelledBy === 'PATIENT'
+            ? 'Bạn (Bệnh nhân)'
+            : 'Hệ thống';
+
+      const scheduledAt = new Date(appointment.scheduledAt);
+      const dateStr = scheduledAt.toLocaleDateString('vi-VN', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+      const timeStr = scheduledAt.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      const paidAmount = Number(appointment.paidAmount || 0);
+      const formattedAmount = new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
+        currency: 'VND',
+      }).format(paidAmount);
+
+      const refundSection =
+        paidAmount > 0
+          ? `
+        <div class="info-box" style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+          <strong>💰 Thông tin hoàn tiền:</strong>
+          <p style="margin: 10px 0 0 0;">Vì bạn đã thanh toán trước cho lịch hẹn này, số tiền <strong>${formattedAmount}</strong> sẽ được hoàn lại vào tài khoản của bạn trong vòng 3-5 ngày làm việc.</p>
+        </div>`
+          : '';
+
+      const html = `
+      <!DOCTYPE html>
+      <html lang="vi">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Xác nhận hủy lịch hẹn</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+          }
+          .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+          }
+          .logo {
+            font-size: 32px;
+            font-weight: bold;
+            color: #071658;
+            margin-bottom: 10px;
+          }
+          h1 {
+            color: #dc3545;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+          }
+          .detail-box {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+          }
+          .detail-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+          }
+          .detail-item:last-child {
+            border-bottom: none;
+          }
+          .label {
+            color: #666;
+            font-size: 14px;
+          }
+          .value {
+            color: #333;
+            font-weight: bold;
+            font-size: 16px;
+          }
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">🫁 DuTu Pulmo</div>
+          </div>
+          
+          <h1>Xác nhận hủy lịch hẹn</h1>
+          
+          <p>Xin chào <strong>${patientName}</strong>,</p>
+          
+          <p>Chúng tôi xác nhận lịch hẹn khám của bạn đã được hủy thành công trên hệ thống.</p>
+          
+          <div class="detail-box">
+            <div class="detail-item">
+              <span class="label">Mã lịch hẹn:</span>
+              <span class="value">${appointment.appointmentNumber}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Bác sĩ:</span>
+              <span class="value">${doctorName}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Thời gian khám:</span>
+              <span class="value">${timeStr}, ${dateStr}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Người thực hiện hủy:</span>
+              <span class="value">${cancellerName}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Lý do hủy:</span>
+              <span class="value">${reason}</span>
+            </div>
+          </div>
+          
+          ${refundSection}
+          
+          <p>Nếu có bất kỳ thắc mắc nào hoặc muốn đặt lại lịch hẹn mới, quý khách có thể thực hiện trực tiếp trên ứng dụng hoặc liên hệ hotline hỗ trợ.</p>
+          
+          <div class="footer">
+            <p>Cần hỗ trợ? Liên hệ: <a href="mailto:support@dutupulmo.vn">support@dutupulmo.vn</a></p>
+            <p>Hotline: 1900-xxxx-xx</p>
+            <p>&copy; 2025 DuTu Pulmo. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+      `;
+
+      await this.emailService['transporter'].sendMail({
+        from: `"DuTu Pulmo Support" <${process.env.SMTP_USER}>`,
+        to: patientEmail,
+        subject: `[DuTu Pulmo] Xác nhận hủy lịch hẹn - ${appointment.appointmentNumber}`,
+        html,
+      });
+
+      this.logger.log(
+        `Sent manual cancellation email to ${patientEmail} for appointment ${appointment.id}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send manual cancellation email for appointment ${appointment.id}:`,
+        error,
+      );
+    }
+  }
+
+  /**
    * HTML template for cancellation email
    */
   private getCancellationEmailTemplate(
