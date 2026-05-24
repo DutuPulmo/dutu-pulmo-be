@@ -6,6 +6,7 @@ import { SlotSchedulerService } from '@/cron/slot-scheduler.service';
 
 import { AppointmentSchedulerService } from '@/cron/appointment-scheduler.service';
 import { PaymentSchedulerService } from '@/cron/payment-scheduler.service';
+import { WakeupSchedulerService } from '@/cron/wakeup-scheduler.service';
 import { Appointment } from '@/modules/appointment/entities/appointment.entity';
 import { TimeSlot } from '@/modules/doctor/entities/time-slot.entity';
 import { MedicalRecord } from '@/modules/medical/entities/medical-record.entity';
@@ -28,11 +29,13 @@ import { NotificationModule } from '@/modules/notification/notification.module';
     SlotSchedulerService,
     AppointmentSchedulerService,
     PaymentSchedulerService,
+    WakeupSchedulerService,
   ],
   exports: [
     SlotSchedulerService,
     AppointmentSchedulerService,
     PaymentSchedulerService,
+    WakeupSchedulerService,
   ],
 })
 export class CronModule {}
