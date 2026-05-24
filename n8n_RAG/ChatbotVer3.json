@@ -42,7 +42,7 @@
       "type": "n8n-nodes-base.webhook",
       "position": [
         1232,
-        3680
+        3672
       ],
       "webhookId": "72d0ce17-8cc0-4939-b6e3-2689ddd093bd",
       "typeVersion": 1.1
@@ -386,7 +386,7 @@
       "name": "Inject to AI Memory",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "position": [
-        1888,
+        1880,
         3968
       ],
       "typeVersion": 1.9
@@ -399,7 +399,7 @@
       "name": "Prepare Booking Response",
       "type": "n8n-nodes-base.code",
       "position": [
-        1952,
+        1944,
         4160
       ],
       "typeVersion": 2
@@ -418,6 +418,37 @@
         4160
       ],
       "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"status\": \"awake\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1456,
+        4384
+      ],
+      "id": "d876f740-5c44-4c99-85d2-87c87018d4da",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "path": "8d238c87-0379-45ce-adae-990b1190727c",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1232,
+        4384
+      ],
+      "id": "63a630a7-4864-48fc-9d04-d845da8a25da",
+      "name": "Webhook_Awake",
+      "webhookId": "8d238c87-0379-45ce-adae-990b1190727c"
     }
   ],
   "pinData": {},
@@ -619,6 +650,17 @@
           }
         ]
       ]
+    },
+    "Webhook_Awake": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -626,7 +668,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "6d0b5713-1f89-4586-a6e5-453cb6869e9a",
+  "versionId": "029ef72e-8632-4355-84a3-0da7bd654711",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "26c301aca3d4cd9c0e95ec6b63c272c94d533b8ac9788d699005f0982b7b8467"
