@@ -26,9 +26,10 @@ export class WakeupSchedulerService {
 
     try {
       this.logger.log(`Pinging wakeup webhook: ${webhookUrl}`);
-      // Send a GET request to wake up
       const response = await axios.get(webhookUrl);
-      this.logger.log(`Wakeup response: ${JSON.stringify(response)}`);
+      this.logger.log(
+        `✅ Wakeup response status: ${response.status} - Data: ${JSON.stringify(response.data)}`,
+      );
     } catch (error) {
       this.logger.error(
         `❌ Error pinging wakeup webhook: ${error instanceof Error ? error.message : String(error)}`,
