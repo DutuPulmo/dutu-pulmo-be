@@ -15,7 +15,6 @@ from routes.predict import predict_bp
 from routes.rules import rules_bp
 from models.disease_config import DISEASE_RULES
 
-
 # ==============================
 # 🔧 LOGGING
 # ==============================
@@ -63,6 +62,13 @@ logger.info(f"🌐 Using: {SCHEME}://{HOST}")
 app = Flask(__name__)
 CORS(app)
 
+from routes.predict import get_model
+model = get_model()
+
+if model:
+    logger.info("✅ Model pre-loaded successfully")
+else:
+    logger.warning("⚠️ Model not loaded")
 
 # ==============================
 # 📄 SWAGGER TEMPLATE
@@ -171,15 +177,6 @@ if __name__ == '__main__':
     logger.info(f"📁 Model path: {Config.get_model_path()}")
     logger.info(f"🔬 Diseases: {len(DISEASE_RULES)}")
     logger.info(f"☁️ Cloudinary: {'ON' if Config.is_cloudinary_configured() else 'OFF'}")
-
-    # preload model
-    from routes.predict import get_model
-    model = get_model()
-
-    if model:
-        logger.info("✅ Model pre-loaded successfully")
-    else:
-        logger.warning("⚠️ Model not loaded")
 
     logger.info(f"🌐 Server running at: {SCHEME}://{HOST}")
     logger.info(f"📄 Swagger docs: {SCHEME}://{HOST}/docs")
