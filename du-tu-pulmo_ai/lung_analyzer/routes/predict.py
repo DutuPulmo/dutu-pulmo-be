@@ -50,7 +50,10 @@ def get_gemini_validator():
             logger.warning(f"Could not initialize GeminiXrayValidator: {e}")
     return _gemini_validator
 
+import threading
+
 _model = None
+_model_lock = threading.Lock()
 
 # --- UTILITY CLASS FOR PERFORMANCE ---
 class PerformanceTimer:
