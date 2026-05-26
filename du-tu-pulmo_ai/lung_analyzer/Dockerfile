@@ -21,5 +21,4 @@ COPY . .
 
 EXPOSE 5000
 
-# Giảm số lượng workers xuống 2 để tránh app bị crash lúc đang chạy (Runtime OOM)
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "--preload", "app:app"]
